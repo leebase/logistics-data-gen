@@ -21,6 +21,13 @@ env/
 .env
 .env.*
 !config/.env.snowflake.example
+config/.env*
+*.env
+*.secrets
+*.secret
+*.key
+*.pem
+*.p8
 
 # Build/packaging
 build/
