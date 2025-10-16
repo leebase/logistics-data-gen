@@ -1,0 +1,37 @@
+# Generation knobs (edit to tune volumes and distributions)
+start_date: "2024-01-01"
+months: 6
+seed: 42
+shipments_target: 8000
+num_customers: 25
+num_carriers: 15
+
+# Probability that shipments are in full
+isfull_rate: 0.96
+
+# Exception rates (uniformly sampled per run between low and high)
+exception_rate_low: 0.06
+exception_rate_high: 0.09
+
+# End-of-month volume ramp
+eom_ramp: 0.12
+
+# U.S. holidays (affect volume weights)
+holidays:
+  - "2024-01-01"   # New Year
+  - "2024-01-15"   # MLK (observed)
+  - "2024-02-19"   # Presidents' Day
+  - "2024-05-27"   # Memorial Day
+  - "2024-07-04"   # Independence Day
+
+# Dwell lognormal params (shape of tail), measured in minutes baseline
+dwell_lognormal_mu_minutes: 3.0
+dwell_lognormal_sigma_minutes: 0.8
+
+# Weekly diesel price curve
+diesel_weekly_start: 4.10
+diesel_weekly_sigma: 0.05
+
+# Tender acceptance rate (affects cancellations/TONU)
+acceptance_rate: 0.92
+

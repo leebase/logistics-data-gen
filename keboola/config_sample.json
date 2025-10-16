@@ -1,0 +1,91 @@
+{
+  "buckets": [
+    {
+      "name": "in.c-logistics",
+      "tables": [
+        { "name": "DIM_CUSTOMER", "primaryKey": ["customer_id"] },
+        { "name": "DIM_CARRIER", "primaryKey": ["carrier_id"] },
+        { "name": "DIM_EQUIPMENT", "primaryKey": ["equipment_id"] },
+        { "name": "DIM_LOCATION", "primaryKey": ["loc_id"] },
+        { "name": "DIM_LANE", "primaryKey": ["lane_id"] },
+        { "name": "DIM_DATE", "primaryKey": ["date_key"] },
+        { "name": "FACT_SHIPMENT", "primaryKey": ["shipment_id", "leg_id"] },
+        { "name": "FACT_EVENT", "primaryKey": ["shipment_id", "event_seq"] },
+        { "name": "FACT_COST", "primaryKey": ["shipment_id", "cost_type", "rate_ref"] }
+      ]
+    }
+  ],
+  "components": [
+    {
+      "id": "keboola.ex-csv",
+      "name": "CSV Extractor",
+      "config": {
+        "parameters": {
+          "files": [
+            { "source": "DIM_CUSTOMER.csv", "destination": "in.c-logistics.DIM_CUSTOMER" },
+            { "source": "DIM_CARRIER.csv", "destination": "in.c-logistics.DIM_CARRIER" },
+            { "source": "DIM_EQUIPMENT.csv", "destination": "in.c-logistics.DIM_EQUIPMENT" },
+            { "source": "DIM_LOCATION.csv", "destination": "in.c-logistics.DIM_LOCATION" },
+            { "source": "DIM_LANE.csv", "destination": "in.c-logistics.DIM_LANE" },
+            { "source": "DIM_DATE.csv", "destination": "in.c-logistics.DIM_DATE" },
+            { "source": "FACT_SHIPMENT.csv", "destination": "in.c-logistics.FACT_SHIPMENT" },
+            { "source": "FACT_EVENT.csv", "destination": "in.c-logistics.FACT_EVENT" },
+            { "source": "FACT_COST.csv", "destination": "in.c-logistics.FACT_COST" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "keboola.wr-db-snowflake",
+      "name": "Snowflake Writer",
+      "config": {
+        "parameters": {
+          "db": {
+            "host": "<SNOWFLAKE_ACCOUNT>",
+            "database": "<DATABASE>",
+            "schema": "<STG_SCHEMA>",
+            "warehouse": "<WAREHOUSE>",
+            "user": "<USER>",
+            "password": "****"
+          },
+          "tables": [
+            { "source": "in.c-logistics.DIM_CUSTOMER", "destination": "DIM_CUSTOMER" },
+            { "source": "in.c-logistics.DIM_CARRIER", "destination": "DIM_CARRIER" },
+            { "source": "in.c-logistics.DIM_EQUIPMENT", "destination": "DIM_EQUIPMENT" },
+            { "source": "in.c-logistics.DIM_LOCATION", "destination": "DIM_LOCATION" },
+            { "source": "in.c-logistics.DIM_LANE", "destination": "DIM_LANE" },
+            { "source": "in.c-logistics.DIM_DATE", "destination": "DIM_DATE" },
+            { "source": "in.c-logistics.FACT_SHIPMENT", "destination": "FACT_SHIPMENT" },
+            { "source": "in.c-logistics.FACT_EVENT", "destination": "FACT_EVENT" },
+            { "source": "in.c-logistics.FACT_COST", "destination": "FACT_COST" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "keboola.snowflake-transformation",
+      "name": "EDW Curate",
+      "config": {
+        "parameters": {
+          "queries": [
+            {
+              "sql": "-- See keboola/transformations/sql/10_curate_edw.sql",
+              "phase": 1
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "orchestrations": [
+    {
+      "name": "Logistics EDW Refresh",
+      "tasks": [
+        { "componentId": "keboola.ex-csv" },
+        { "componentId": "keboola.wr-db-snowflake" },
+        { "componentId": "keboola.snowflake-transformation" }
+      ]
+    }
+  ]
+}
+

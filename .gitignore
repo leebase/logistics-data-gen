@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual envs
+.venv/
+venv/
+env/
+
+# OS/editor
+.DS_Store
+.idea/
+.vscode/
+
+# Env/config
+.env
+.env.*
+
+# Build/packaging
+build/
+dist/
+*.egg-info/
+
+# Data outputs (keep metadata file)
+data/out/*.csv
+data/out/*.csv.gz
+data/raw/
+data/processed/
+data/external/
+
+# Notebooks
+notebooks/.ipynb_checkpoints/
+
+# Power BI binaries
+powerbi/*.pbix
+
+# Coverage/Reports
+.coverage
+coverage.xml
+
