@@ -41,6 +41,9 @@ data/raw/
 data/processed/
 data/external/
 
+# Generated SQL artifacts (do not version)
+snowflake/.generated/
+
 # Notebooks
 notebooks/.ipynb_checkpoints/
 

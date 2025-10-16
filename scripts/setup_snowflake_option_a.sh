@@ -10,10 +10,27 @@ repo_root="$(cd "$here/.." && pwd)"
 
 env_file="${ENV_FILE:-$repo_root/.env.snowflake}"
 apply=0
+# Parameter overrides (default to empty; env or CLI can set)
+OVR_WAREHOUSE=""; OVR_DATABASE=""; OVR_STG=""; OVR_EDW=""; OVR_APP_ROLE=""; OVR_APP_USER=""; OVR_AUTH=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --apply) apply=1; shift ;;
     --env) env_file="$2"; shift 2 ;;
+    --warehouse) OVR_WAREHOUSE="$2"; shift 2 ;;
+    --database) OVR_DATABASE="$2"; shift 2 ;;
+    --stg) OVR_STG="$2"; shift 2 ;;
+    --edw) OVR_EDW="$2"; shift 2 ;;
+    --app-role) OVR_APP_ROLE="$2"; shift 2 ;;
+    --app-user) OVR_APP_USER="$2"; shift 2 ;;
+    --authenticator) OVR_AUTH="$2"; shift 2 ;;
+    -h|--help)
+      cat << USAGE
+Usage: $(basename "$0") [--env .envfile] [--apply] \\
+       [--warehouse LOGISTICS_WH] [--database LOGISTICS_DB] [--stg STG] [--edw EDW] \\
+       [--app-role LOGISTICS_APP_ROLE] [--app-user KEBOOLA_LOGISTICS_USER] [--authenticator externalbrowser]
+USAGE
+      exit 0
+      ;;
     *) echo "Unknown arg: $1" >&2; exit 2 ;;
   esac
 done
@@ -26,11 +43,11 @@ else
   echo "Note: env file $env_file not found. Using current environment variables." >&2
 fi
 
-# Defaults if not provided
-WAREHOUSE=${WAREHOUSE:-${SNOWFLAKE_WAREHOUSE:-LOGISTICS_WH}}
-DATABASE=${DATABASE:-${SNOWFLAKE_DATABASE:-LOGISTICS_DB}}
-STG_SCHEMA=${STG_SCHEMA:-${SNOWFLAKE_STG_SCHEMA:-STG}}
-EDW_SCHEMA=${EDW_SCHEMA:-${SNOWFLAKE_EDW_SCHEMA:-EDW}}
+# Defaults if not provided (OVR_* > env > defaults)
+WAREHOUSE=${OVR_WAREHOUSE:-${WAREHOUSE:-${SNOWFLAKE_WAREHOUSE:-LOGISTICS_WH}}}
+DATABASE=${OVR_DATABASE:-${DATABASE:-${SNOWFLAKE_DATABASE:-LOGISTICS_DB}}}
+STG_SCHEMA=${OVR_STG:-${STG_SCHEMA:-${SNOWFLAKE_STG_SCHEMA:-STG}}}
+EDW_SCHEMA=${OVR_EDW:-${EDW_SCHEMA:-${SNOWFLAKE_EDW_SCHEMA:-EDW}}}
 
 ACCOUNT=${SNOWSQL_ACCOUNT:-${SNOWFLAKE_ACCOUNT:-}}
 USER=${SNOWSQL_USER:-${SNOWFLAKE_USER:-}}
@@ -38,7 +55,7 @@ ROLE=${SNOWSQL_ROLE:-${SNOWFLAKE_ROLE:-ACCOUNTADMIN}}
 BOOTSTRAP_ROLE=${SNOWSQL_BOOTSTRAP_ROLE:-${BOOTSTRAP_ROLE:-ACCOUNTADMIN}}
 WAREHOUSE_CONN=${SNOWSQL_WAREHOUSE:-$WAREHOUSE}
 DATABASE_CONN=${SNOWSQL_DATABASE:-$DATABASE}
-AUTHENTICATOR=${SNOWSQL_AUTHENTICATOR:-${AUTHENTICATOR:-}}
+AUTHENTICATOR=${OVR_AUTH:-${SNOWSQL_AUTHENTICATOR:-${AUTHENTICATOR:-}}}
 
 if [[ -z "${ACCOUNT}" || -z "${USER}" ]]; then
   echo "ERROR: Missing SNOWFLAKE account/user. Set SNOWFLAKE_ACCOUNT and SNOWFLAKE_USER (or SNOWSQL_* aliases) in $env_file." >&2
@@ -61,8 +78,8 @@ render "$repo_root/snowflake/00_schema.sql" "$gen_dir/00_schema_resolved.sql"
 render "$repo_root/snowflake/01_tables.sql" "$gen_dir/01_tables_resolved.sql"
 
 # Roles & user
-APP_ROLE=${SNOWFLAKE_APP_ROLE:-${APP_ROLE:-LOGISTICS_APP_ROLE}}
-APP_USER=${SNOWFLAKE_APP_USER:-${APP_USER:-KEBOOLA_LOGISTICS_USER}}
+APP_ROLE=${OVR_APP_ROLE:-${SNOWFLAKE_APP_ROLE:-${APP_ROLE:-LOGISTICS_APP_ROLE}}}
+APP_USER=${OVR_APP_USER:-${SNOWFLAKE_APP_USER:-${APP_USER:-KEBOOLA_LOGISTICS_USER}}}
 sed -e "s/<WAREHOUSE>/$WAREHOUSE/g" \
     -e "s/<DATABASE>/$DATABASE/g" \
     -e "s/<STG_SCHEMA>/$STG_SCHEMA/g" \
