@@ -1,5 +1,27 @@
 # Keboola How‑To: Load Logistics CSVs into Snowflake
 
+---------- Pre setup ------------------
+  What you need to do now
+
+  - Set the password (outside of git) for KEBOOLA_LOGISTICS_USER:
+      - Connect as ACCOUNTADMIN (leebase with admin role) and run:
+          - ALTER USER KEBOOLA_LOGISTICS_USER SET PASSWORD = '<STRONG_PASSWORD>';
+  - Or configure key-pair auth:
+      - ALTER USER KEBOOLA_LOGISTICS_USER SET RSA_PUBLIC_KEY = '<PEM_BASE64>';
+
+  Keboola configuration
+
+  - Snowflake Writer connection:
+      - Account: YVCGSJW-AF47375
+      - User: KEBOOLA_LOGISTICS_USER
+      - Role: LOGISTICS_APP_ROLE
+      - Warehouse: LOGISTICS_WH
+      - Database: LOGISTICS_DB
+      - Schema: STG
+  - Then follow docs/KeboolaHowTo.md to upload CSVs to Storage, run the Writer, and execute the EDW transformation.
+
+--------------------------------------------
+
 This guide walks you through setting up a fresh Keboola project and wiring it to load the generated CSVs (`data/out/*.csv`) into your Snowflake STG schema, then running a SQL transformation to curate EDW tables.
 
 ## Prerequisites
