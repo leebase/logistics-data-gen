@@ -19,6 +19,8 @@ This repository is a ready-to-run assessment scaffold for a logistics BI exercis
 | snowflake/02_stages_and_pipes.sql         | Stages, sample COPY commands, optional Streams/Tasks (commented) |
 | snowflake/03_merge_upserts.sql            | MERGE templates for idempotent incremental upserts |
 | snowflake/04_quality_checks.sql           | Query pack for data quality checks |
+| snowflake/05_visual_validation.sql         | Query pack mirroring Power BI visuals for validation |
+| snowflake/06_streamlit.sql                 | SQL to stage and create Streamlit app in Snowflake |
 | keboola/README.md                         | Keboola components and configuration mapping guide |
 | keboola/config_sample.json                | Illustrative JSON scaffolding for Keboola components |
 | keboola/transformations/sql/10_curate_edw.sql | SQL to curate EDW tables and compute flags |
@@ -28,4 +30,6 @@ This repository is a ready-to-run assessment scaffold for a logistics BI exercis
 | data/out/.gitkeep                         | Placeholder to keep output directory in git |
 | scripts/bootstrap.sh                      | Bootstrap local venv, install deps, run generator, next steps |
 | scripts/load_snowflake.sh                 | Example snowsql loader with env vars and COPY commands |
+| scripts/deploy_streamlit.sh               | Deploy Streamlit app to Snowflake stage and create Streamlit object |
+| streamlit/app.py                          | Streamlit app replicating Power BI KPIs/visuals (runs in Snowflake) |
 | Makefile                                  | Phony targets for venv, data, snowflake DDL, load, checks, clean |
