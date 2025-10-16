@@ -27,8 +27,9 @@ Key deliverables:
 - CSVs are written to `data/out/`: `Dim*.csv`, `Fact*.csv`.
 
 3) Snowflake setup (admin)
+- Configure environment variables: see `snowflake/snowflakeInfo.md` and copy `config/.env.snowflake.example` to `.env.snowflake`.
 - Create objects and grants: `make snowflake_ddl` (prints commands) or run `snowflake/00_schema.sql` and `snowflake/01_tables.sql` via snowsql.
-- Load data using `scripts/load_snowflake.sh` (review and edit env vars first).
+- Load data using `scripts/load_snowflake.sh` (review and edit env vars first). Note: In this assessment, Keboola performs data loading; use the loader only for manual testing.
 
 4) Keboola orchestration
 - See `keboola/README.md` and `keboola/config_sample.json` for wiring extractors/writers and SQL transformations.
@@ -55,6 +56,7 @@ Key deliverables:
 ## Secrets
 
 - Do not commit credentials. Use environment variables and `<PLACEHOLDER>` patterns in SQL/scripts. See `docs/admin_guide.md` for details.
+ - Snowflake env reference: `snowflake/snowflakeInfo.md`. Template: `config/.env.snowflake.example`.
 
 ## What the candidate must do
 
@@ -62,4 +64,3 @@ Key deliverables:
 - Build Power BI model and visuals per spec with working DAX measures.
 
 See `docs/user_guide.md` and `docs/scoring_rubric.md` for expectations and scoring.
-

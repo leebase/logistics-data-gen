@@ -9,6 +9,13 @@
 
 ## Provision Snowflake
 
+### Environment Variables
+
+- Copy `config/.env.snowflake.example` to `.env.snowflake` and fill your account details.
+- Reference: `snowflake/snowflakeInfo.md` for variable descriptions and snowsql usage.
+- Optionally export for your shell session:
+  - `set -a; source ./.env.snowflake; set +a`
+
 1) Create roles/warehouse/db/schema (edit placeholders).
 - Open `snowflake/00_schema.sql` and replace:
   - `<SNOWFLAKE_ACCOUNT>`, `<WAREHOUSE>`, `<DATABASE>`, `<STG_SCHEMA>`, `<EDW_SCHEMA>`, `<ROLE>`, `<USER>`
@@ -51,4 +58,3 @@ Outputs are in `data/out/`.
 
 - Keep secrets out of repo. Use SNOWSQL env variables and Keboola project secrets.
 - Use Snowflake roles/grants; limit writable schemas to STG/EDW as needed.
-
