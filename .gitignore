@@ -20,6 +20,7 @@ env/
 # Env/config
 .env
 .env.*
+!config/.env.snowflake.example
 
 # Build/packaging
 build/
@@ -42,4 +43,3 @@ powerbi/*.pbix
 # Coverage/Reports
 .coverage
 coverage.xml
-
