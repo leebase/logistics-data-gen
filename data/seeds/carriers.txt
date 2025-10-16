@@ -1,0 +1,54 @@
+# One name per line. Lines starting with # are ignored.
+# Sample North American carriers (plus generic fillers)
+J.B. Hunt
+Schneider National
+Knight-Swift
+Werner Enterprises
+CRST International
+Landstar System
+C.R. England
+Old Dominion Freight Line
+XPO Logistics
+R+L Carriers
+Estes Express Lines
+Saia LTL Freight
+FedEx Freight
+UPS Freight
+TForce Freight
+YRC Freight
+ABF Freight
+ArcBest Logistics
+Forward Air
+Yellow Logistics
+Prime Inc.
+Swift Transportation
+Penske Logistics
+Ryder Dedicated
+Odyssey Logistics
+Hub Group
+NFI Industries
+Schneider Intermodal
+BNSF Logistics
+JB Hunt Intermodal
+U.S. Xpress
+USA Truck
+PAM Transport
+Marten Transport
+Heartland Express
+Averitt Express
+Dayton Freight
+Central Transport
+Pitt Ohio
+AAA Cooper Transportation
+Southeastern Freight Lines
+A Duie Pyle
+Reddaway
+New England Motor Freight
+Acme Freight Co.
+Blue Ridge Logistics
+NorthStar Transport
+Prairie Line Haulers
+Coastal Carriers
+Mountain Peak Logistics
+Lakeview Freight
+

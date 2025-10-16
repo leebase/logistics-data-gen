@@ -47,6 +47,7 @@ class Config:
     diesel_start_price: float
     diesel_weekly_sigma: float
     acceptance_rate: float
+    seeds_dir: str | None = None
 
 
 def parse_args() -> argparse.Namespace:
@@ -84,6 +85,7 @@ def load_config(path: Path) -> Config:
         diesel_start_price=float(raw.get("diesel_weekly_start", 4.10)),
         diesel_weekly_sigma=float(raw.get("diesel_weekly_sigma", 0.05)),
         acceptance_rate=float(raw.get("acceptance_rate", 0.92)),
+        seeds_dir=raw.get("seeds_dir", "data/seeds"),
     )
 
 
@@ -172,12 +174,46 @@ def weighted_dates(cfg: Config, rng: random.Random) -> List[date]:
     return dates
 
 
+def _load_seed_list(path: Path) -> List[str]:
+    if not path.exists():
+        return []
+    items: List[str] = []
+    with path.open("r", encoding="utf-8") as f:
+        for line in f:
+            s = line.strip()
+            if not s or s.startswith("#"):
+                continue
+            items.append(s)
+    return items
+
+
+def _pick_unique(names: List[str], count: int, rng: random.Random) -> List[str]:
+    if not names:
+        return [f"Company {i:03d}" for i in range(1, count + 1)]
+    pool = names[:]
+    rng.shuffle(pool)
+    out: List[str] = []
+    i = 0
+    while len(out) < count:
+        name = pool[i % len(pool)]
+        if name not in out:
+            out.append(name)
+        else:
+            # make unique variant deterministically
+            out.append(f"{name} {len(out)+1}")
+        i += 1
+    return out
+
+
 def build_customers(cfg: Config, rng: random.Random, load_dt: datetime) -> List[Dict]:
     segments = ["Retail", "Manufacturing", "E-Commerce", "Automotive", "CPG"]
     regions = ["Northeast", "Midwest", "South", "West"]
+    # Load seed names if present
+    seed_dir = Path(cfg.seeds_dir or "data/seeds")
+    customer_seeds = _load_seed_list(seed_dir / "customers.txt")
+    names = _pick_unique(customer_seeds, cfg.num_customers, rng)
     rows = []
-    for cid in range(1, cfg.num_customers + 1):
-        name = f"Customer {cid:03d}"
+    for cid, name in enumerate(names, start=1):
         rows.append(
             {
                 "customer_id": cid,
@@ -194,14 +230,17 @@ def build_customers(cfg: Config, rng: random.Random, load_dt: datetime) -> List[
 def build_carriers(cfg: Config, rng: random.Random, load_dt: datetime) -> List[Dict]:
     modes = ["TL", "LTL", "Intermodal"]
     tiers = ["Bronze", "Silver", "Gold", "Platinum"]
+    seed_dir = Path(cfg.seeds_dir or "data/seeds")
+    carrier_seeds = _load_seed_list(seed_dir / "carriers.txt")
+    names = _pick_unique(carrier_seeds, cfg.num_carriers, rng)
     rows = []
-    for cid in range(1, cfg.num_carriers + 1):
+    for cid, name in enumerate(names, start=1):
         mode = rng.choices(modes, weights=[0.55, 0.30, 0.15])[0]
         tier = rng.choices(tiers, weights=[0.25, 0.35, 0.30, 0.10])[0]
         rows.append(
             {
                 "carrier_id": cid,
-                "name": f"Carrier {cid:03d}",
+                "name": name,
                 "mode": mode,
                 "mc_number": f"MC{rng.randint(100000, 999999)}",
                 "score_tier": tier,
@@ -744,4 +783,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

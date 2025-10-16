@@ -1,0 +1,101 @@
+# One name per line. Lines starting with # are ignored.
+# Sample consumer/retail/manufacturing brands
+McDonalds
+PepsiCo
+Coca-Cola
+Walmart
+Amazon
+Target
+Costco
+Home Depot
+Lowe's
+Kroger
+Albertsons
+Walgreens
+CVS Health
+Best Buy
+IKEA
+Nike
+Adidas
+Under Armour
+Apple
+Microsoft
+Samsung
+Sony
+Lenovo
+Dell Technologies
+HP Inc.
+Procter & Gamble
+Unilever
+Nestle
+Mondelez
+Kellogg's
+General Mills
+Colgate-Palmolive
+Kimberly-Clark
+Johnson & Johnson
+Pfizer
+Merck
+Bayer
+3M
+Honeywell
+GE Appliances
+Whirlpool
+Bosch
+Siemens
+Caterpillar
+John Deere
+Ford Motor Company
+General Motors
+Toyota
+Honda
+Nissan
+Hyundai
+Tesla
+Subaru
+Volvo Cars
+Stellantis
+Molson Coors
+Anheuser-Busch
+Heineken
+Constellation Brands
+AB InBev
+Tyson Foods
+Hormel Foods
+JBS USA
+Cargill
+Archer Daniels Midland
+DHL Supply Chain
+FedEx
+UPS
+USPS
+XPO Logistics
+Ryder
+Expeditors
+C.H. Robinson
+Kuehne+Nagel
+Maersk
+H&M
+Zara
+Gap Inc.
+LVMH
+Estee Lauder
+Sephora
+Ulta Beauty
+Wayfair
+Chewy
+Petco
+Tractor Supply Co.
+Ace Hardware
+Sherwin-Williams
+Grainger
+Fastenal
+Sysco
+US Foods
+Peet's Coffee
+Starbucks
+Chipotle
+Panera Bread
+Domino's
+Pizza Hut
+

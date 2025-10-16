@@ -16,6 +16,14 @@ Synthetic logistics dataset with dims and facts designed for a shipment-leg grai
 
 All timestamps are UTC in ISO 8601 format. Numeric fields use `.` decimal separator.
 
+## Seeded Names
+
+- Realistic names for `DIM_CUSTOMER.name` and `DIM_CARRIER.name` can be provided via:
+  - `data/seeds/customers.txt`
+  - `data/seeds/carriers.txt`
+- One name per line; lines starting with `#` are ignored. If the file is missing, a built-in fallback list is used.
+- Adjust `num_customers` and `num_carriers` in `data/config.yaml` to control how many are sampled.
+
 ## Column Dictionary (selected)
 
 - FactShipment
@@ -59,4 +67,3 @@ All timestamps are UTC in ISO 8601 format. Numeric fields use `.` decimal separa
 - Shipments: ~8k by default (configurable)
 - Events: ~6–10 per shipment (tender, accept, at origin/dest, pickup, delivery, dwell, exception)
 - Costs: 2–3 rows per shipment (base, fuel, optional accessorial)
-
