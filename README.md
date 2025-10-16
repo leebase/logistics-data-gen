@@ -32,7 +32,8 @@ Key deliverables:
 - Load data using `scripts/load_snowflake.sh` (review and edit env vars first). Note: In this assessment, Keboola performs data loading; use the loader only for manual testing.
 
 4) Keboola orchestration
-- See `keboola/README.md` and `keboola/config_sample.json` for wiring extractors/writers and SQL transformations.
+- See `docs/KeboolaHowTo.md` for end-to-end setup (account, project, Storage, Writer, Transform, Orchestration).
+- Also see `keboola/README.md` and `keboola/config_sample.json` for wiring extractors/writers and SQL transformations.
 - Curate EDW with `keboola/transformations/sql/10_curate_edw.sql`.
 
 5) Power BI

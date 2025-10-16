@@ -9,6 +9,7 @@ This repository is a ready-to-run assessment scaffold for a logistics BI exercis
 | sprintplan.md                             | Two-sprint plan with stories, DoD, and estimates |
 | docs/admin_guide.md                       | Admin steps for Snowflake, environment, running scripts, validation |
 | docs/user_guide.md                        | Candidate instructions for Keboola + Power BI usage and outcomes |
+| docs/KeboolaHowTo.md                      | End-to-end Keboola setup guide to load CSVs into Snowflake |
 | docs/scoring_rubric.md                    | Scoring rubric for reviewers across ETL/SQL/Modeling/BI/Docs |
 | powerbi/modeling_guide.md                 | Star schema relationships, DAX guidance, visuals, slicers, KPIs |
 | powerbi/dax_measures.md                   | Final DAX measures for KPIs and helpers |
@@ -28,4 +29,3 @@ This repository is a ready-to-run assessment scaffold for a logistics BI exercis
 | scripts/bootstrap.sh                      | Bootstrap local venv, install deps, run generator, next steps |
 | scripts/load_snowflake.sh                 | Example snowsql loader with env vars and COPY commands |
 | Makefile                                  | Phony targets for venv, data, snowflake DDL, load, checks, clean |
-
