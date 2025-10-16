@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: venv data snowflake_ddl load checks clean
+.PHONY: venv data snowflake_ddl load checks clean install_hooks
 
 VENV := .venv
 PY := $(VENV)/bin/python
@@ -31,3 +31,5 @@ clean:
 	rm -rf $(VENV)
 	rm -f data/out/*.csv
 
+install_hooks:
+	@bash scripts/install_git_hooks.sh
