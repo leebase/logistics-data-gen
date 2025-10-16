@@ -22,6 +22,12 @@
 - Apply via snowsql:
   - `snowsql -a <SNOWFLAKE_ACCOUNT> -u <USER> -r <ROLE> -f snowflake/00_schema.sql`
 
+Or run the parameterized helper script (recommended):
+- One‑shot setup using `.env.snowflake` values:
+  - `./scripts/setup_snowflake_option_a.sh --apply`
+- Flags to override at runtime (optional):
+  - `--warehouse LOGISTICS_WH --database LOGISTICS_DB --stg STG --edw EDW --app-role LOGISTICS_APP_ROLE --app-user KEBOOLA_LOGISTICS_USER --authenticator externalbrowser`
+
 2) Create tables and file formats:
 - `snowsql ... -f snowflake/01_tables.sql`
 
@@ -40,10 +46,10 @@ Outputs are in `data/out/`.
 
 ## Load Data
 
-- Edit env vars in `scripts/load_snowflake.sh`
-- Run:
-  - `bash scripts/load_snowflake.sh`
-- This prints example COPY statements or runs COPY (uncomment to execute).
+- Loader script (manual testing only; Keboola should load data in the assessment):
+  - Dry run (print commands): `./scripts/load_snowflake.sh`
+  - Execute: `./scripts/load_snowflake.sh --apply`
+  - Optionally pass a custom env file: `./scripts/load_snowflake.sh --env ./my.snowflake.env --apply`
 
 ## Validate
 

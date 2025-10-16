@@ -28,8 +28,11 @@ Key deliverables:
 
 3) Snowflake setup (admin)
 - Configure environment variables: see `snowflake/snowflakeInfo.md` and copy `config/.env.snowflake.example` to `.env.snowflake`.
-- Create objects and grants: `make snowflake_ddl` (prints commands) or run `snowflake/00_schema.sql` and `snowflake/01_tables.sql` via snowsql.
-- Load data using `scripts/load_snowflake.sh` (review and edit env vars first). Note: In this assessment, Keboola performs data loading; use the loader only for manual testing.
+- One‑shot setup (creates warehouse, DB, schemas, tables, role/user):
+  - `./scripts/setup_snowflake_option_a.sh --apply`
+  - Flags (optional): `--warehouse`, `--database`, `--stg`, `--edw`, `--app-role`, `--app-user`, `--authenticator`, `--env`
+- Manual SQL alternative: `make snowflake_ddl` (prints commands) then run SnowSQL on `snowflake/00_schema.sql` and `snowflake/01_tables.sql`.
+- (Optional) Load CSVs directly for testing: `./scripts/load_snowflake.sh --apply` (Keboola is the intended loader).
 
 4) Keboola orchestration
 - See `docs/KeboolaHowTo.md` for end-to-end setup (account, project, Storage, Writer, Transform, Orchestration).
