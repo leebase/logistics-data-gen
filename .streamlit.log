@@ -1,0 +1,38 @@
+Traceback (most recent call last):
+  File "/Volumes/NVME1/nextcloud/projects/logistics-data/.venv/bin/streamlit", line 7, in <module>
+    sys.exit(main())
+  File "/Volumes/NVME1/nextcloud/projects/logistics-data/.venv/lib/python3.9/site-packages/click/core.py", line 1161, in __call__
+    return self.main(*args, **kwargs)
+  File "/Volumes/NVME1/nextcloud/projects/logistics-data/.venv/lib/python3.9/site-packages/click/core.py", line 1082, in main
+    rv = self.invoke(ctx)
+  File "/Volumes/NVME1/nextcloud/projects/logistics-data/.venv/lib/python3.9/site-packages/click/core.py", line 1697, in invoke
+    return _process_result(sub_ctx.command.invoke(sub_ctx))
+  File "/Volumes/NVME1/nextcloud/projects/logistics-data/.venv/lib/python3.9/site-packages/click/core.py", line 1443, in invoke
+    return ctx.invoke(self.callback, **ctx.params)
+  File "/Volumes/NVME1/nextcloud/projects/logistics-data/.venv/lib/python3.9/site-packages/click/core.py", line 788, in invoke
+    return __callback(*args, **kwargs)
+  File "/Volumes/NVME1/nextcloud/projects/logistics-data/.venv/lib/python3.9/site-packages/streamlit/web/cli.py", line 237, in main_run
+    _main_run(target, args, flag_options=kwargs)
+  File "/Volumes/NVME1/nextcloud/projects/logistics-data/.venv/lib/python3.9/site-packages/streamlit/web/cli.py", line 279, in _main_run
+    bootstrap.run(file, is_hello, args, flag_options)
+  File "/Volumes/NVME1/nextcloud/projects/logistics-data/.venv/lib/python3.9/site-packages/streamlit/web/bootstrap.py", line 332, in run
+    asyncio.run(main())
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/runners.py", line 44, in run
+    return loop.run_until_complete(main)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 642, in run_until_complete
+    return future.result()
+  File "/Volumes/NVME1/nextcloud/projects/logistics-data/.venv/lib/python3.9/site-packages/streamlit/web/bootstrap.py", line 309, in main
+    await run_server()
+  File "/Volumes/NVME1/nextcloud/projects/logistics-data/.venv/lib/python3.9/site-packages/streamlit/web/bootstrap.py", line 291, in run_server
+    await server.start()
+  File "/Volumes/NVME1/nextcloud/projects/logistics-data/.venv/lib/python3.9/site-packages/streamlit/web/server/server.py", line 341, in start
+    start_listening(app)
+  File "/Volumes/NVME1/nextcloud/projects/logistics-data/.venv/lib/python3.9/site-packages/streamlit/web/server/server.py", line 186, in start_listening
+    start_listening_tcp_socket(http_server)
+  File "/Volumes/NVME1/nextcloud/projects/logistics-data/.venv/lib/python3.9/site-packages/streamlit/web/server/server.py", line 253, in start_listening_tcp_socket
+    http_server.listen(port, address)
+  File "/Volumes/NVME1/nextcloud/projects/logistics-data/.venv/lib/python3.9/site-packages/tornado/tcpserver.py", line 183, in listen
+    sockets = bind_sockets(
+  File "/Volumes/NVME1/nextcloud/projects/logistics-data/.venv/lib/python3.9/site-packages/tornado/netutil.py", line 162, in bind_sockets
+    sock.bind(sockaddr)
+PermissionError: [Errno 1] Operation not permitted

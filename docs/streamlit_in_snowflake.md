@@ -30,7 +30,7 @@ Notes:
 - Upload code and create the app:
   - `./scripts/deploy_streamlit.sh`  (uses `.env.snowflake`)
   - Optional overrides: `--stage APP_CODE --name LOGISTICS_DASH --env ./my.snowflake.env`
-- The script will print the Streamlit URL. Click to open the app.
+- The script attempts to print the Streamlit URL. Some accounts/SnowSQL versions do not support `SYSTEM$SHOW_STREAMLIT_URL`; in that case, open via UI: Snowflake → Databases → `LOGISTICS_DB` → `EDW` → Streamlit → `LOGISTICS_DASH` → Open → Rerun.
 
 ## Deploy (SQL Worksheet)
 
@@ -49,3 +49,7 @@ Notes:
 ## Notes
 - The app uses SQL queries similar to `snowflake/05_visual_validation.sql` to compute KPIs server-side.
 - For large datasets, adjust limits in queries (e.g., lane list and drill table LIMITs).
+
+### Visual Details
+- Lane Performance uses blue bars for Avg Transit Days and orange points for OTD% on a secondary axis (points avoid implying a time-series trend across categorical lanes).
+- A sidebar slider filters lanes by minimum shipment count to reduce noise.

@@ -60,6 +60,11 @@ Outputs are in `data/out/`.
   - OTD: 80–95% depending on carriers/lanes
   - GM/Mile: typically USD $0.25–$0.60 (synthetic)
 
+### Normalize EDW Names (if needed)
+If loads created quoted-lowercase tables/columns (e.g., `"dim_customer"."name"`), you can normalize to canonical uppercase (DIM_CUSTOMER.NAME) using:
+- `snowflake/99_normalize_edw_names.sql` — run block-by-block in a worksheet. It renames quoted columns to uppercase and, where safe, renames quoted-lower tables to uppercase. Review counts before altering.
+Alternatively, keep mixed case — the Streamlit app now handles uppercase tables with quoted-lower columns ("mixed" variant) automatically.
+
 ## Security
 
 - Keep secrets out of repo. Use SNOWSQL env variables and Keboola project secrets.

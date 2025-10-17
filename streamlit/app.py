@@ -88,32 +88,62 @@ def _filters_clause(
     lanes: List[str],
     date_start: Optional[str],
     date_end: Optional[str],
+    quoted_tables: bool,
+    quoted_cols: bool,
 ) -> str:
     """Build a SQL filters clause using names (resolved to IDs inside SQL)."""
     f = []
     if date_start:
-        f.append(f" AND DATE(f.delivery_actual_ts) >= '{date_start}' ")
+        f.append(f" AND DATE(TRY_TO_TIMESTAMP_NTZ(f.delivery_actual_ts)) >= '{date_start}' ")
     if date_end:
-        f.append(f" AND DATE(f.delivery_actual_ts) <= '{date_end}' ")
+        f.append(f" AND DATE(TRY_TO_TIMESTAMP_NTZ(f.delivery_actual_ts)) <= '{date_end}' ")
+
+    # Resolve table/column quoting based on variant
+    dim_customer_tbl = (
+        f"{database}.{edw_schema}.\"dim_customer\"" if quoted_tables else f"{database}.{edw_schema}.DIM_CUSTOMER"
+    )
+    dim_carrier_tbl = (
+        f"{database}.{edw_schema}.\"dim_carrier\"" if quoted_tables else f"{database}.{edw_schema}.DIM_CARRIER"
+    )
+    dim_equipment_tbl = (
+        f"{database}.{edw_schema}.\"dim_equipment\"" if quoted_tables else f"{database}.{edw_schema}.DIM_EQUIPMENT"
+    )
+    dim_lane_tbl = (
+        f"{database}.{edw_schema}.\"dim_lane\"" if quoted_tables else f"{database}.{edw_schema}.DIM_LANE"
+    )
+    dim_loc_tbl = (
+        f"{database}.{edw_schema}.\"dim_location\"" if quoted_tables else f"{database}.{edw_schema}.DIM_LOCATION"
+    )
+
+    name_col = '"name"' if quoted_cols else 'NAME'
+    type_col = '"type"' if quoted_cols else 'TYPE'
+    lane_id_col = '"lane_id"' if quoted_cols else 'LANE_ID'
+    origin_col = '"origin_loc_id"' if quoted_cols else 'ORIGIN_LOC_ID'
+    dest_col = '"dest_loc_id"' if quoted_cols else 'DEST_LOC_ID'
+    loc_id_col = '"loc_id"' if quoted_cols else 'LOC_ID'
+    city_col = '"city"' if quoted_cols else 'CITY'
 
     # Name filters resolved to IDs via DIM tables
     if customers:
         esc = [c.replace("'", "''") for c in customers]
         s = ",".join([f"'{x}'" for x in esc])
+        cust_id_col = '"customer_id"' if quoted_cols else 'CUSTOMER_ID'
         f.append(
-            f" AND f.customer_id IN (SELECT customer_id FROM {database}.{edw_schema}.DIM_CUSTOMER WHERE name IN ({s})) "
+            f" AND f.customer_id IN (SELECT {cust_id_col} FROM {dim_customer_tbl} WHERE {name_col} IN ({s})) "
         )
     if carriers:
         esc = [c.replace("'", "''") for c in carriers]
         s = ",".join([f"'{x}'" for x in esc])
+        carrier_id_col = '"carrier_id"' if quoted_cols else 'CARRIER_ID'
         f.append(
-            f" AND f.carrier_id IN (SELECT carrier_id FROM {database}.{edw_schema}.DIM_CARRIER WHERE name IN ({s})) "
+            f" AND f.carrier_id IN (SELECT {carrier_id_col} FROM {dim_carrier_tbl} WHERE {name_col} IN ({s})) "
         )
     if equipment:
         esc = [e.replace("'", "''") for e in equipment]
         s = ",".join([f"'{x}'" for x in esc])
+        equipment_id_col = '"equipment_id"' if quoted_cols else 'EQUIPMENT_ID'
         f.append(
-            f" AND f.equipment_id IN (SELECT equipment_id FROM {database}.{edw_schema}.DIM_EQUIPMENT WHERE type IN ({s})) "
+            f" AND f.equipment_id IN (SELECT {equipment_id_col} FROM {dim_equipment_tbl} WHERE {type_col} IN ({s})) "
         )
     if lanes:
         # lanes passed as "Origin → Dest"
@@ -121,11 +151,11 @@ def _filters_clause(
         s = ",".join([f"'{x}'" for x in esc])
         f.append(
             " AND f.lane_id IN (\n"
-            f"   SELECT l.lane_id\n"
-            f"   FROM {database}.{edw_schema}.DIM_LANE l\n"
-            f"   JOIN {database}.{edw_schema}.DIM_LOCATION o ON l.origin_loc_id = o.loc_id\n"
-            f"   JOIN {database}.{edw_schema}.DIM_LOCATION d ON l.dest_loc_id = d.loc_id\n"
-            f"   WHERE (o.city || ' → ' || d.city) IN ({s})\n"
+            f"   SELECT l.{lane_id_col}\n"
+            f"   FROM {dim_lane_tbl} l\n"
+            f"   JOIN {dim_loc_tbl} o ON l.{origin_col} = o.{loc_id_col}\n"
+            f"   JOIN {dim_loc_tbl} d ON l.{dest_col} = d.{loc_id_col}\n"
+            f"   WHERE (o.{city_col} || ' → ' || d.{city_col}) IN ({s})\n"
             ") "
         )
     return "".join(f)
@@ -140,6 +170,10 @@ def main():
     try:
         timeout_s = int(os.getenv("STATEMENT_TIMEOUT", "45"))
         session.sql(f"ALTER SESSION SET STATEMENT_TIMEOUT_IN_SECONDS={timeout_s}").collect()
+        # Ensure ISO8601 with timezone offsets parse reliably if EDW was loaded as VARCHAR
+        session.sql(
+            """ALTER SESSION SET TIMESTAMP_INPUT_FORMAT='YYYY-MM-DD"T"HH24:MI:SS.FF TZH:TZM'"""
+        ).collect()
     except Exception:
         pass
 
@@ -154,6 +188,23 @@ def main():
         edw_schema = "EDW"
 
     st.sidebar.header("Filters")
+    # Diagnostic snapshot: show counts and date span to guide filters
+    diag_sql = f"""
+    SELECT
+      COUNT(*) AS total,
+      COUNT_IF(TRY_TO_TIMESTAMP_NTZ(delivery_actual_ts) IS NOT NULL) AS delivered,
+      MIN(DATE(TRY_TO_TIMESTAMP_NTZ(delivery_actual_ts))) AS min_delivery_date,
+      MAX(DATE(TRY_TO_TIMESTAMP_NTZ(delivery_actual_ts))) AS max_delivery_date
+    FROM {database}.{edw_schema}.FACT_SHIPMENT
+    """
+    try:
+        diag = None if is_local else run_df(diag_sql)
+        if diag is not None and not diag.empty:
+            with st.expander("Data Snapshot (EDW.FACT_SHIPMENT)", expanded=False):
+                st.write(diag)
+    except Exception:
+        pass
+
     # Fetch lists
     @st.cache_data(show_spinner=False, ttl=60)
     def run_df(sql: str) -> pd.DataFrame:
@@ -302,19 +353,36 @@ def main():
         # Fallback empty
         return pd.DataFrame()
 
-    dim_df = run_df(
+    def run_df_first(sqls: list[str]) -> pd.DataFrame:
+        last_err: Exception | None = None
+        for q in sqls:
+            try:
+                df = run_df(q)
+                return df
+            except Exception as e:  # pragma: no cover
+                last_err = e
+                continue
+        if last_err:
+            raise last_err
+        return pd.DataFrame()
+
+    # Three variants:
+    #  - lower: quoted-lowercase tables + quoted-lowercase columns
+    #  - mixed: UPPERCASE tables + quoted-lowercase columns
+    #  - upper: UPPERCASE tables + UPPERCASE columns
+    dims_sql_upper = (
         f"""
         WITH c AS (
-            SELECT name FROM {database}.{edw_schema}.DIM_CUSTOMER ORDER BY name LIMIT 5000
+            SELECT NAME AS name FROM {database}.{edw_schema}.DIM_CUSTOMER ORDER BY NAME LIMIT 5000
         ), cr AS (
-            SELECT name FROM {database}.{edw_schema}.DIM_CARRIER ORDER BY name LIMIT 5000
+            SELECT NAME AS name FROM {database}.{edw_schema}.DIM_CARRIER ORDER BY NAME LIMIT 5000
         ), eq AS (
-            SELECT DISTINCT type AS name FROM {database}.{edw_schema}.DIM_EQUIPMENT ORDER BY 1
+            SELECT DISTINCT TYPE AS name FROM {database}.{edw_schema}.DIM_EQUIPMENT ORDER BY 1
         ), ln AS (
-            SELECT (o.city || ' → ' || d.city) AS label
+            SELECT (o.CITY || ' → ' || d.CITY) AS label
             FROM {database}.{edw_schema}.DIM_LANE l
-            JOIN {database}.{edw_schema}.DIM_LOCATION o ON l.origin_loc_id = o.loc_id
-            JOIN {database}.{edw_schema}.DIM_LOCATION d ON l.dest_loc_id = d.loc_id
+            JOIN {database}.{edw_schema}.DIM_LOCATION o ON l.ORIGIN_LOC_ID = o.LOC_ID
+            JOIN {database}.{edw_schema}.DIM_LOCATION d ON l.DEST_LOC_ID = d.LOC_ID
             QUALIFY ROW_NUMBER() OVER (ORDER BY label) <= 5000
         )
         SELECT 'customer' AS "k", name AS "v" FROM c
@@ -323,6 +391,63 @@ def main():
         UNION ALL SELECT 'lane' AS "k", label AS "v" FROM ln
         """
     )
+
+    dims_sql_lower = (
+        f"""
+        WITH c AS (
+            SELECT "name" AS name FROM {database}.{edw_schema}."dim_customer" ORDER BY "name" LIMIT 5000
+        ), cr AS (
+            SELECT "name" AS name FROM {database}.{edw_schema}."dim_carrier" ORDER BY "name" LIMIT 5000
+        ), eq AS (
+            SELECT DISTINCT "type" AS name FROM {database}.{edw_schema}."dim_equipment" ORDER BY 1
+        ), ln AS (
+            SELECT (o."city" || ' → ' || d."city") AS label
+            FROM {database}.{edw_schema}."dim_lane" l
+            JOIN {database}.{edw_schema}."dim_location" o ON l."origin_loc_id" = o."loc_id"
+            JOIN {database}.{edw_schema}."dim_location" d ON l."dest_loc_id" = d."loc_id"
+            QUALIFY ROW_NUMBER() OVER (ORDER BY label) <= 5000
+        )
+        SELECT 'customer' AS "k", name AS "v" FROM c
+        UNION ALL SELECT 'carrier' AS "k", name AS "v" FROM cr
+        UNION ALL SELECT 'equipment' AS "k", name AS "v" FROM eq
+        UNION ALL SELECT 'lane' AS "k", label AS "v" FROM ln
+        """
+    )
+
+    dims_sql_mixed = (
+        f"""
+        WITH c AS (
+            SELECT "name" AS name FROM {database}.{edw_schema}.DIM_CUSTOMER ORDER BY "name" LIMIT 5000
+        ), cr AS (
+            SELECT "name" AS name FROM {database}.{edw_schema}.DIM_CARRIER ORDER BY "name" LIMIT 5000
+        ), eq AS (
+            SELECT DISTINCT "type" AS name FROM {database}.{edw_schema}.DIM_EQUIPMENT ORDER BY 1
+        ), ln AS (
+            SELECT (o."city" || ' → ' || d."city") AS label
+            FROM {database}.{edw_schema}.DIM_LANE l
+            JOIN {database}.{edw_schema}.DIM_LOCATION o ON l."origin_loc_id" = o."loc_id"
+            JOIN {database}.{edw_schema}.DIM_LOCATION d ON l."dest_loc_id" = d."loc_id"
+            QUALIFY ROW_NUMBER() OVER (ORDER BY label) <= 5000
+        )
+        SELECT 'customer' AS "k", name AS "v" FROM c
+        UNION ALL SELECT 'carrier' AS "k", name AS "v" FROM cr
+        UNION ALL SELECT 'equipment' AS "k", name AS "v" FROM eq
+        UNION ALL SELECT 'lane' AS "k", label AS "v" FROM ln
+        """
+    )
+
+    # Try lower (quoted tables), then mixed (upper tables, quoted cols), then upper (upper tables/cols)
+    for variant, sql in (("lower", dims_sql_lower), ("mixed", dims_sql_mixed), ("upper", dims_sql_upper)):
+        try:
+            dim_df = run_df(sql)
+            dims_variant = variant
+            break
+        except Exception:
+            continue
+    else:
+        # If all fail, raise the last error by running upper to surface message
+        dim_df = run_df(dims_sql_upper)
+        dims_variant = "upper"
 
     customers = dim_df.loc[dim_df["k"] == "customer", "v"].tolist() if not dim_df.empty else []
     carriers = dim_df.loc[dim_df["k"] == "carrier", "v"].tolist() if not dim_df.empty else []
@@ -335,16 +460,14 @@ def main():
 
     # Date range defaults
     anchor_df = run_df(
-        f"SELECT MAX(DATE(delivery_actual_ts)) AS d FROM {database}.{edw_schema}.FACT_SHIPMENT"
+        f"SELECT MIN(CAST(TRY_TO_TIMESTAMP_TZ(NULLIF(TRIM(delivery_actual_ts), '')) AS DATE)) AS min_d, "
+        f"MAX(CAST(TRY_TO_TIMESTAMP_TZ(NULLIF(TRIM(delivery_actual_ts), '')) AS DATE)) AS max_d "
+        f"FROM {database}.{edw_schema}.FACT_SHIPMENT WHERE NULLIF(TRIM(delivery_actual_ts), '') IS NOT NULL"
     )
-    anchor = anchor_df["d"].iloc[0] if not anchor_df.empty else None
-    default_start = None
-    default_end = None
-    if anchor is not None:
-        import datetime as _dt
-
-        default_end = anchor
-        default_start = anchor - _dt.timedelta(days=180)
+    min_d = anchor_df.get("min_d").iloc[0] if not anchor_df.empty else None
+    max_d = anchor_df.get("max_d").iloc[0] if not anchor_df.empty else None
+    default_start = min_d
+    default_end = max_d
 
     dr = st.sidebar.date_input(
         "Delivery Date Range",
@@ -358,7 +481,18 @@ def main():
     sel_equipment = st.sidebar.multiselect("Equipment", options=equipments)
     sel_lanes = st.sidebar.multiselect("Lanes", options=lanes)
 
-    filters = _filters_clause(database, edw_schema, sel_customers, sel_carriers, sel_equipment, sel_lanes, date_start, date_end)
+    filters = _filters_clause(
+        database,
+        edw_schema,
+        sel_customers,
+        sel_carriers,
+        sel_equipment,
+        sel_lanes,
+        date_start,
+        date_end,
+        quoted_tables=(dims_variant == "lower"),
+        quoted_cols=(dims_variant in ("lower", "mixed")),
+    )
 
     st.sidebar.caption(f"Context: DB={database}, EDW={edw_schema}")
 
@@ -368,10 +502,10 @@ def main():
     otd_sql = f"""
     WITH params AS (SELECT {grace} AS grace),
     delivered AS (
-      SELECT DATE(f.delivery_actual_ts) AS d,
-             IFF(f.delivery_actual_ts <= f.delivery_plan_ts + (SELECT grace FROM params) * INTERVAL '1 MINUTE', 1, 0) AS is_otd
+      SELECT CAST(TRY_TO_TIMESTAMP_TZ(NULLIF(TRIM(f.delivery_actual_ts), '')) AS DATE) AS d,
+             IFF(TRY_TO_TIMESTAMP_TZ(NULLIF(TRIM(f.delivery_actual_ts), '')) <= DATEADD(minute, (SELECT grace FROM params), TRY_TO_TIMESTAMP_TZ(NULLIF(TRIM(f.delivery_plan_ts), ''))), 1, 0) AS is_otd
       FROM {database}.{edw_schema}.FACT_SHIPMENT f
-      WHERE f.delivery_actual_ts IS NOT NULL {filters}
+      WHERE NULLIF(TRIM(f.delivery_actual_ts), '') IS NOT NULL {filters}
     ), anchor AS (
       SELECT MAX(d) AS anchor_date FROM delivered
     ), win AS (
@@ -433,9 +567,9 @@ def main():
     col3.metric("Tender Acceptance %", f"{ta_rate:.1%}")
 
     atd_sql = f"""
-    SELECT AVG(DATEDIFF('day', pickup_actual_ts, delivery_actual_ts)) AS avg_transit_days
+    SELECT AVG(DATEDIFF('day', TRY_TO_TIMESTAMP_TZ(NULLIF(TRIM(pickup_actual_ts), '')), TRY_TO_TIMESTAMP_TZ(NULLIF(TRIM(delivery_actual_ts), '')))) AS avg_transit_days
     FROM {database}.{edw_schema}.FACT_SHIPMENT f
-    WHERE pickup_actual_ts IS NOT NULL AND delivery_actual_ts IS NOT NULL {filters}
+    WHERE NULLIF(TRIM(pickup_actual_ts), '') IS NOT NULL AND NULLIF(TRIM(delivery_actual_ts), '') IS NOT NULL {filters}
     """
     atd = run_df(atd_sql)
     avg_transit = float(atd.iloc[0, 0]) if not atd.empty and atd.iloc[0, 0] is not None else 0.0
@@ -448,18 +582,45 @@ def main():
             st.dataframe(pd.DataFrame(st.session_state["_query_times"]))
 
     # Lane Performance (bar: Avg Transit Days, line: OTD %)
+    # Build expressions for column case based on DIM variant
+    quoted = (dims_variant in ("lower", "mixed"))
+    cust_name_col = 'c."name"' if quoted else 'c.NAME'
+    car_name_col = 'cr."name"' if quoted else 'cr.NAME'
+    o_city_expr = 'o."city"' if quoted else 'o.CITY'
+    d_city_expr = 'd."city"' if quoted else 'd.CITY'
+    l_lane_id = 'l."lane_id"' if quoted else 'l.LANE_ID'
+    l_origin_id = 'l."origin_loc_id"' if quoted else 'l.ORIGIN_LOC_ID'
+    l_dest_id = 'l."dest_loc_id"' if quoted else 'l.DEST_LOC_ID'
+    o_loc_id = 'o."loc_id"' if quoted else 'o.LOC_ID'
+    d_loc_id = 'd."loc_id"' if quoted else 'd.LOC_ID'
+    c_cust_id = 'c."customer_id"' if quoted else 'c.CUSTOMER_ID'
+    cr_carrier_id = 'cr."carrier_id"' if quoted else 'cr.CARRIER_ID'
+
+    tbl_lane = (
+        f"{database}.{edw_schema}.\"dim_lane\"" if dims_variant == "lower" else f"{database}.{edw_schema}.DIM_LANE"
+    )
+    tbl_loc = (
+        f"{database}.{edw_schema}.\"dim_location\"" if dims_variant == "lower" else f"{database}.{edw_schema}.DIM_LOCATION"
+    )
+    tbl_cust = (
+        f"{database}.{edw_schema}.\"dim_customer\"" if dims_variant == "lower" else f"{database}.{edw_schema}.DIM_CUSTOMER"
+    )
+    tbl_carrier = (
+        f"{database}.{edw_schema}.\"dim_carrier\"" if dims_variant == "lower" else f"{database}.{edw_schema}.DIM_CARRIER"
+    )
+
     lane_sql = f"""
     WITH params AS (SELECT {grace} AS grace)
     SELECT
-      o.city || ' → ' || d.city AS lane,
+      {o_city_expr} || ' → ' || {d_city_expr} AS lane,
       COUNT(*) AS shipments,
-      AVG(DATEDIFF('day', f.pickup_actual_ts, f.delivery_actual_ts)) AS avg_transit_days,
-      AVG(IFF(f.delivery_actual_ts IS NOT NULL AND f.delivery_actual_ts <= f.delivery_plan_ts + (SELECT grace FROM params) * INTERVAL '1 MINUTE', 1, 0)) AS otd_rate
+      AVG(DATEDIFF('day', TRY_TO_TIMESTAMP_TZ(NULLIF(TRIM(f.pickup_actual_ts), '')), TRY_TO_TIMESTAMP_TZ(NULLIF(TRIM(f.delivery_actual_ts), '')))) AS avg_transit_days,
+      AVG(IFF(TRY_TO_TIMESTAMP_TZ(NULLIF(TRIM(f.delivery_actual_ts), '')) IS NOT NULL AND TRY_TO_TIMESTAMP_TZ(NULLIF(TRIM(f.delivery_actual_ts), '')) <= DATEADD(minute, (SELECT grace FROM params), TRY_TO_TIMESTAMP_TZ(NULLIF(TRIM(f.delivery_plan_ts), ''))), 1, 0)) AS otd_rate
     FROM {database}.{edw_schema}.FACT_SHIPMENT f
-    JOIN {database}.{edw_schema}.DIM_LANE l ON f.lane_id = l.lane_id
-    JOIN {database}.{edw_schema}.DIM_LOCATION o ON l.origin_loc_id = o.loc_id
-    JOIN {database}.{edw_schema}.DIM_LOCATION d ON l.dest_loc_id = d.loc_id
-    WHERE f.pickup_actual_ts IS NOT NULL AND f.delivery_actual_ts IS NOT NULL {filters}
+    JOIN {tbl_lane} l ON f.lane_id = {l_lane_id}
+    JOIN {tbl_loc} o ON {l_origin_id} = {o_loc_id}
+    JOIN {tbl_loc} d ON {l_dest_id} = {d_loc_id}
+    WHERE NULLIF(TRIM(f.pickup_actual_ts), '') IS NOT NULL AND NULLIF(TRIM(f.delivery_actual_ts), '') IS NOT NULL {filters}
     GROUP BY 1
     ORDER BY shipments DESC
     LIMIT 50
@@ -468,10 +629,35 @@ def main():
     import altair as alt  # type: ignore
 
     if not lane_df.empty:
-        base = alt.Chart(lane_df).encode(x=alt.X("lane:N", sort='-y'))
-        bars = base.mark_bar(color="#4C78A8").encode(y=alt.Y("avg_transit_days:Q", title="Avg Transit Days"))
-        line = base.mark_line(color="#F58518").encode(y=alt.Y("otd_rate:Q", axis=alt.Axis(format="%"), title="OTD %"))
-        st.altair_chart((bars + line).resolve_scale(y='independent'), use_container_width=True)
+        # Optional filter to reduce noise
+        min_ship = st.slider("Min shipments per lane (chart)", 1, int(lane_df["shipments"].max()), 5)
+        lane_df = lane_df[lane_df["shipments"] >= min_ship]
+        if lane_df.empty:
+            st.info("No lanes meet the minimum shipments filter.")
+        else:
+            base = alt.Chart(lane_df).encode(
+                x=alt.X("lane:N", sort='-y', title="Lane (Origin → Dest)")
+            )
+            bars = base.mark_bar(color="#4C78A8").encode(
+                y=alt.Y("avg_transit_days:Q", title="Avg Transit Days"),
+                tooltip=[
+                    alt.Tooltip("lane:N"),
+                    alt.Tooltip("shipments:Q"),
+                    alt.Tooltip("avg_transit_days:Q", format=".2f"),
+                    alt.Tooltip("otd_rate:Q", format=".1%"),
+                ],
+            )
+            # Use points instead of a connecting line across categories
+            points = base.mark_point(color="#F58518", filled=True, size=70).encode(
+                y=alt.Y("otd_rate:Q", axis=alt.Axis(format="%", title="OTD %")),
+                tooltip=[
+                    alt.Tooltip("lane:N"),
+                    alt.Tooltip("shipments:Q"),
+                    alt.Tooltip("avg_transit_days:Q", format=".2f"),
+                    alt.Tooltip("otd_rate:Q", format=".1%"),
+                ],
+            )
+            st.altair_chart((bars + points).resolve_scale(y='independent'), use_container_width=True)
     else:
         st.info("No lane data for selected filters.")
 
@@ -484,10 +670,10 @@ def main():
       FROM {database}.{edw_schema}.FACT_EVENT e
       WHERE e.event_type = 'Exception'
     )
-    SELECT c.name AS customer_name, ex.exception_type, COUNT(*) AS exceptions
+    SELECT {cust_name_col} AS customer_name, ex.exception_type, COUNT(*) AS exceptions
     FROM ex
     JOIN {database}.{edw_schema}.FACT_SHIPMENT f ON f.shipment_id = ex.shipment_id
-    JOIN {database}.{edw_schema}.DIM_CUSTOMER c ON c.customer_id = f.customer_id
+    JOIN {tbl_cust} c ON {c_cust_id} = f.customer_id
     WHERE 1=1 {filters}
     GROUP BY 1,2
     """
@@ -508,22 +694,25 @@ def main():
     drill_sql = f"""
     SELECT
       f.shipment_id, f.leg_id,
-      c.name AS customer_name,
-      cr.name AS carrier_name,
-      o.city || ' → ' || d.city AS lane,
+      {cust_name_col} AS customer_name,
+      {car_name_col} AS carrier_name,
+      {o_city_expr} || ' → ' || {d_city_expr} AS lane,
       f.status,
-      f.pickup_plan_ts, f.pickup_actual_ts,
-      f.delivery_plan_ts, f.delivery_actual_ts,
-      IFF(f.delivery_actual_ts IS NOT NULL AND f.delivery_actual_ts <= f.delivery_plan_ts + {grace} * INTERVAL '1 MINUTE', TRUE, FALSE) AS isdeliveredontime,
-      f.isinfull, (IFF(f.delivery_actual_ts IS NOT NULL AND f.delivery_actual_ts <= f.delivery_plan_ts + {grace} * INTERVAL '1 MINUTE', TRUE, FALSE) AND f.isinfull) AS isotif,
+      TRY_TO_TIMESTAMP_TZ(NULLIF(TRIM(f.pickup_plan_ts), '')) AS pickup_plan_ts,
+      TRY_TO_TIMESTAMP_TZ(NULLIF(TRIM(f.pickup_actual_ts), '')) AS pickup_actual_ts,
+      TRY_TO_TIMESTAMP_TZ(NULLIF(TRIM(f.delivery_plan_ts), '')) AS delivery_plan_ts,
+      TRY_TO_TIMESTAMP_TZ(NULLIF(TRIM(f.delivery_actual_ts), '')) AS delivery_actual_ts,
+      IFF(TRY_TO_TIMESTAMP_TZ(NULLIF(TRIM(f.delivery_actual_ts), '')) IS NOT NULL AND TRY_TO_TIMESTAMP_TZ(NULLIF(TRIM(f.delivery_actual_ts), '')) <= DATEADD(minute, {grace}, TRY_TO_TIMESTAMP_TZ(NULLIF(TRIM(f.delivery_plan_ts), ''))), TRUE, FALSE) AS isdeliveredontime,
+      f.isinfull,
+      (IFF(TRY_TO_TIMESTAMP_TZ(NULLIF(TRIM(f.delivery_actual_ts), '')) IS NOT NULL AND TRY_TO_TIMESTAMP_TZ(NULLIF(TRIM(f.delivery_actual_ts), '')) <= DATEADD(minute, {grace}, TRY_TO_TIMESTAMP_TZ(NULLIF(TRIM(f.delivery_plan_ts), ''))), TRUE, FALSE) AND f.isinfull) AS isotif,
       f.planned_miles, f.actual_miles, f.revenue, f.total_cost,
       (f.revenue - f.total_cost) / NULLIF(f.planned_miles, 0) AS gm_per_mile
     FROM {database}.{edw_schema}.FACT_SHIPMENT f
-    JOIN {database}.{edw_schema}.DIM_CUSTOMER c ON c.customer_id = f.customer_id
-    JOIN {database}.{edw_schema}.DIM_CARRIER cr ON cr.carrier_id = f.carrier_id
-    JOIN {database}.{edw_schema}.DIM_LANE l ON l.lane_id = f.lane_id
-    JOIN {database}.{edw_schema}.DIM_LOCATION o ON o.loc_id = l.origin_loc_id
-    JOIN {database}.{edw_schema}.DIM_LOCATION d ON d.loc_id = l.dest_loc_id
+    JOIN {tbl_cust} c ON {c_cust_id} = f.customer_id
+    JOIN {tbl_carrier} cr ON {cr_carrier_id} = f.carrier_id
+    JOIN {tbl_lane} l ON {l_lane_id} = f.lane_id
+    JOIN {tbl_loc} o ON {o_loc_id} = {l_origin_id}
+    JOIN {tbl_loc} d ON {d_loc_id} = {l_dest_id}
     WHERE 1=1 {filters}
     ORDER BY f.shipment_id, f.leg_id
     LIMIT 1000
