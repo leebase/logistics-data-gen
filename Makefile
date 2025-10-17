@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: venv data snowflake_ddl load checks clean install_hooks
+.PHONY: venv install data snowflake_ddl load checks clean install_hooks streamlit_local
 
 VENV := .venv
 PY := $(VENV)/bin/python
@@ -8,7 +8,11 @@ PY := $(VENV)/bin/python
 venv:
 	@echo "Creating venv and installing deps..."
 	python3 -m venv $(VENV)
-	. $(VENV)/bin/activate && python -m pip install --upgrade pip pyyaml
+	. $(VENV)/bin/activate && python -m pip install --upgrade pip
+
+install: venv
+	@echo "Installing requirements.txt into venv..."
+	. $(VENV)/bin/activate && python -m pip install -r requirements.txt
 
 data: venv
 	@echo "Generating synthetic data..."
@@ -30,6 +34,10 @@ checks:
 clean:
 	rm -rf $(VENV)
 	rm -f data/out/*.csv
+
+streamlit_local: install
+	@echo "Running local Streamlit app (use .env.snowflake for credentials)..."
+	. $(VENV)/bin/activate && ./scripts/run_streamlit_local.sh
 
 install_hooks:
 	@bash scripts/install_git_hooks.sh
