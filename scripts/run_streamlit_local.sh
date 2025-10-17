@@ -10,10 +10,14 @@ if [[ -f "$root/.env.snowflake" ]]; then
   set -a; source "$root/.env.snowflake"; set +a
 fi
 
+# If SF_PASSWORD not set, fall back to SNOWSQL_PWD for convenience
+if [[ -z "${SF_PASSWORD:-}" && -n "${SNOWSQL_PWD:-}" ]]; then
+  export SF_PASSWORD="${SNOWSQL_PWD}"
+fi
+
 if ! command -v streamlit >/dev/null 2>&1; then
   echo "Installing dev dependencies (virtualenv recommended)..." >&2
   python3 -m pip install -r "$root/requirements-dev.txt"
 fi
 
 exec streamlit run "$root/streamlit/app.py"
-
