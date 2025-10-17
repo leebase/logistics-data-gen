@@ -43,9 +43,12 @@ Key deliverables:
 - Use `powerbi/modeling_guide.md`, `powerbi/dax_measures.md`, and `powerbi/visual_spec.md`.
 - Build star schema and KPIs (OTD%, OTIF%, GM/Mile, Tender Acceptance %, Avg Transit Days, Exceptions).
 
-6) Streamlit Dashboard (Optional)
-- Local dev: `./scripts/run_streamlit_local.sh` (requires `requirements-dev.txt`)
-- In Snowflake: see `docs/streamlit_in_snowflake.md` or run `./scripts/deploy_streamlit.sh`
+6) Streamlit App (Optional but recommended)
+- What it is: a Snowflake‑native Streamlit dashboard that mirrors the Power BI deliverable (OTD/OTIF, GM/Mile, Tender Acceptance, Avg Transit Days, Lane performance, Exception heatmap, drill table).
+- Quick start:
+  - Local: `./scripts/run_streamlit_local.sh` (requires `requirements-dev.txt` and `.env.snowflake` or `USE_LOCAL_DATA=1` for CSV‑only mode)
+  - Snowflake: `./scripts/deploy_streamlit.sh` and then open the app from the Snowflake UI (Database → EDW → Streamlit → LOGISTICS_DASH → Open → Rerun)
+- Learn more: see `docs/streamlit_logistics_app.md` (usage, filters, visuals, tips) and `docs/streamlit_in_snowflake.md` (deploy details).
 
 ## Repo Layout
 

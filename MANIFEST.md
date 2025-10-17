@@ -9,6 +9,8 @@ This repository is a ready-to-run assessment scaffold for a logistics BI exercis
 | sprintplan.md                             | Two-sprint plan with stories, DoD, and estimates |
 | docs/admin_guide.md                       | Admin steps for Snowflake, environment, running scripts, validation |
 | docs/user_guide.md                        | Candidate instructions for Keboola + Power BI usage and outcomes |
+| docs/streamlit_logistics_app.md           | Guide to using the Streamlit Logistics App (usage, filters, visuals) |
+| docs/streamlit_in_snowflake.md            | How to deploy/run the Streamlit app in Snowflake and locally |
 | docs/KeboolaHowTo.md                      | End-to-end Keboola setup guide to load CSVs into Snowflake |
 | docs/scoring_rubric.md                    | Scoring rubric for reviewers across ETL/SQL/Modeling/BI/Docs |
 | powerbi/modeling_guide.md                 | Star schema relationships, DAX guidance, visuals, slicers, KPIs |
@@ -19,8 +21,10 @@ This repository is a ready-to-run assessment scaffold for a logistics BI exercis
 | snowflake/02_stages_and_pipes.sql         | Stages, sample COPY commands, optional Streams/Tasks (commented) |
 | snowflake/03_merge_upserts.sql            | MERGE templates for idempotent incremental upserts |
 | snowflake/04_quality_checks.sql           | Query pack for data quality checks |
-| snowflake/05_visual_validation.sql         | Query pack mirroring Power BI visuals for validation |
+| snowflake/05_visual_validation.sql        | Query pack mirroring Power BI visuals for validation |
+| snowflake/dashboard_test.sql              | Robust SQL pack to validate dashboard KPIs/visuals with safe casting |
 | snowflake/06_streamlit.sql                 | SQL to stage and create Streamlit app in Snowflake |
+| snowflake/99_normalize_edw_names.sql      | Helper to normalize EDW names to canonical uppercase (optional) |
 | keboola/README.md                         | Keboola components and configuration mapping guide |
 | keboola/config_sample.json                | Illustrative JSON scaffolding for Keboola components |
 | keboola/transformations/sql/10_curate_edw.sql | SQL to curate EDW tables and compute flags |
