@@ -39,5 +39,10 @@ streamlit_local: install
 	@echo "Running local Streamlit app (use .env.snowflake for credentials)..."
 	. $(VENV)/bin/activate && ./scripts/run_streamlit_local.sh
 
+.PHONY: dev_up
+dev_up: install
+	@echo "Starting local Streamlit with health check & auto-open..."
+	. $(VENV)/bin/activate && ./scripts/dev_up.sh
+
 install_hooks:
 	@bash scripts/install_git_hooks.sh

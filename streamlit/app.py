@@ -1,4 +1,5 @@
 import os
+import pandas as pd
 from typing import List, Optional
 
 import streamlit as st
@@ -133,6 +134,13 @@ def main():
     st.set_page_config(page_title="Logistics KPIs", layout="wide")
     session = get_session()
 
+    # Set a short statement timeout to avoid long hangs in UI (seconds)
+    try:
+        timeout_s = int(os.getenv("STATEMENT_TIMEOUT", "45"))
+        session.sql(f"ALTER SESSION SET STATEMENT_TIMEOUT_IN_SECONDS={timeout_s}").collect()
+    except Exception:
+        pass
+
     # Context
     current_db = session.sql("SELECT CURRENT_DATABASE(), CURRENT_SCHEMA() ").to_pandas()
     default_db = current_db.iloc[0, 0]
@@ -141,7 +149,16 @@ def main():
 
     st.sidebar.header("Filters")
     # Fetch lists
-    dim_df = session.sql(
+    def run_df(sql: str) -> pd.DataFrame:
+        try:
+            df = session.sql(sql).to_pandas()
+            df.columns = [str(c).lower() for c in df.columns]
+            return df
+        except Exception as e:
+            st.error(f"Query failed: {e}")
+            return pd.DataFrame()
+
+    dim_df = run_df(
         f"""
         WITH c AS (
             SELECT name FROM {database}.{edw_schema}.DIM_CUSTOMER ORDER BY name LIMIT 5000
@@ -161,9 +178,7 @@ def main():
         UNION ALL SELECT 'equipment' AS "k", name AS "v" FROM eq
         UNION ALL SELECT 'lane' AS "k", label AS "v" FROM ln
         """
-    ).to_pandas()
-    # Normalize column names to lowercase for consistent access
-    dim_df.columns = [str(c).lower() for c in dim_df.columns]
+    )
 
     customers = dim_df.loc[dim_df["k"] == "customer", "v"].tolist() if not dim_df.empty else []
     carriers = dim_df.loc[dim_df["k"] == "carrier", "v"].tolist() if not dim_df.empty else []
@@ -175,10 +190,9 @@ def main():
     gm_target = st.sidebar.slider("GM/Mile Target", min_value=0.10, max_value=1.00, value=0.40, step=0.05)
 
     # Date range defaults
-    anchor_df = session.sql(
+    anchor_df = run_df(
         f"SELECT MAX(DATE(delivery_actual_ts)) AS d FROM {database}.{edw_schema}.FACT_SHIPMENT"
-    ).to_pandas()
-    anchor_df.columns = [str(c).lower() for c in anchor_df.columns]
+    )
     anchor = anchor_df["d"].iloc[0] if not anchor_df.empty else None
     default_start = None
     default_end = None
@@ -235,7 +249,7 @@ def main():
       (prev30.n_otd::FLOAT / NULLIF(prev30.n_deliv,0)) AS otd_prior_30
     FROM last30, prev30
     """
-    otd = session.sql(otd_sql).to_pandas()
+    otd = run_df(otd_sql)
     otd_last = float(otd.iloc[0, 0]) if not otd.empty and otd.iloc[0, 0] is not None else 0.0
     otd_prior = float(otd.iloc[0, 1]) if not otd.empty and otd.iloc[0, 1] is not None else 0.0
     otd_delta = otd_last - otd_prior
@@ -254,7 +268,7 @@ def main():
     )
     SELECT (rev - cost) / NULLIF(miles, 0) AS gm_per_mile FROM ytd
     """
-    gmm = session.sql(gmm_sql).to_pandas()
+    gmm = run_df(gmm_sql)
     gm_mile = float(gmm.iloc[0, 0]) if not gmm.empty and gmm.iloc[0, 0] is not None else 0.0
     col2.metric("GM/Mile (YTD)", f"${gm_mile:.2f}", delta=f"{gm_mile - gm_target:+.2f} vs {gm_target:.2f}")
 
@@ -270,7 +284,7 @@ def main():
     )
     SELECT (SELECT COUNT(*) FROM accepted)::FLOAT / NULLIF((SELECT COUNT(*) FROM tendered), 0) AS tender_acceptance_events
     """
-    ta = session.sql(ta_sql).to_pandas()
+    ta = run_df(ta_sql)
     ta_rate = float(ta.iloc[0, 0]) if not ta.empty and ta.iloc[0, 0] is not None else 0.0
     col3.metric("Tender Acceptance %", f"{ta_rate:.1%}")
 
@@ -279,7 +293,7 @@ def main():
     FROM {database}.{edw_schema}.FACT_SHIPMENT f
     WHERE pickup_actual_ts IS NOT NULL AND delivery_actual_ts IS NOT NULL {filters}
     """
-    atd = session.sql(atd_sql).to_pandas()
+    atd = run_df(atd_sql)
     avg_transit = float(atd.iloc[0, 0]) if not atd.empty and atd.iloc[0, 0] is not None else 0.0
     col4.metric("Avg Transit Days", f"{avg_transit:.2f}")
 
@@ -302,8 +316,7 @@ def main():
     ORDER BY shipments DESC
     LIMIT 50
     """
-    lane_df = session.sql(lane_sql).to_pandas()
-    lane_df.columns = [str(c).lower() for c in lane_df.columns]
+    lane_df = run_df(lane_sql)
     import altair as alt  # type: ignore
 
     if not lane_df.empty:
@@ -330,8 +343,7 @@ def main():
     WHERE 1=1 {filters}
     GROUP BY 1,2
     """
-    ex_df = session.sql(ex_sql).to_pandas()
-    ex_df.columns = [str(c).lower() for c in ex_df.columns]
+    ex_df = run_df(ex_sql)
     if not ex_df.empty:
         heat = (
             alt.Chart(ex_df)
@@ -368,7 +380,7 @@ def main():
     ORDER BY f.shipment_id, f.leg_id
     LIMIT 1000
     """
-    drill_df = session.sql(drill_sql).to_pandas()
+    drill_df = run_df(drill_sql)
     st.subheader("Shipment Details (top 1000)")
     st.dataframe(drill_df, use_container_width=True)
 
