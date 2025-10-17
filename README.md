@@ -43,6 +43,10 @@ Key deliverables:
 - Use `powerbi/modeling_guide.md`, `powerbi/dax_measures.md`, and `powerbi/visual_spec.md`.
 - Build star schema and KPIs (OTD%, OTIF%, GM/Mile, Tender Acceptance %, Avg Transit Days, Exceptions).
 
+6) Streamlit Dashboard (Optional)
+- Local dev: `./scripts/run_streamlit_local.sh` (requires `requirements-dev.txt`)
+- In Snowflake: see `docs/streamlit_in_snowflake.md` or run `./scripts/deploy_streamlit.sh`
+
 ## Repo Layout
 
 - Code and scripts: `data/`, `scripts/`, `snowflake/`, `keboola/`, `powerbi/`.

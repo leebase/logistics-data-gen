@@ -6,25 +6,68 @@ import streamlit as st
 try:
     # Streamlit in Snowflake
     from snowflake.snowpark.context import get_active_session  # type: ignore
-    from snowflake.snowpark import Session  # type: ignore
 except Exception:  # pragma: no cover
     get_active_session = None  # type: ignore
+
+try:  # Local development fallback
+    from snowflake.snowpark import Session  # type: ignore
+except Exception:  # pragma: no cover
     Session = None  # type: ignore
 
 
 @st.cache_resource(show_spinner=False)
 def get_session():
-    """Return a Snowpark session when running inside Snowflake Streamlit.
+    """Return a Snowpark session.
 
-    If running locally, this will raise; the app is intended for Streamlit in Snowflake.
+    - In Snowflake: use get_active_session.
+    - Locally: build a Snowpark Session from environment variables.
     """
-    if get_active_session is None:
+    if get_active_session is not None:
+        try:
+            return get_active_session()
+        except Exception:
+            pass
+
+    # Local fallback
+    if Session is None:
         st.error(
-            "This app is intended to run inside Snowflake (Streamlit in Snowflake).\n"
-            "Please deploy using the provided SQL in snowflake/06_streamlit.sql."
+            "Snowpark is not available. For local dev, install dependencies (requirements-dev.txt)\n"
+            "and ensure snowflake-snowpark-python is installed."
         )
         st.stop()
-    return get_active_session()
+
+    required = [
+        "SNOWFLAKE_ACCOUNT",
+        "SNOWFLAKE_USER",
+        "SF_PASSWORD",
+        "SNOWFLAKE_ROLE",
+        "SNOWFLAKE_WAREHOUSE",
+        "SNOWFLAKE_DATABASE",
+        "SNOWFLAKE_STG_SCHEMA",
+        "SNOWFLAKE_EDW_SCHEMA",
+    ]
+    missing = [k for k in required if os.getenv(k) in (None, "")]
+    if missing:
+        st.error(
+            "Missing environment for local run: " + ", ".join(missing) +
+            "\nSource .env.snowflake or pass environment variables before running."
+        )
+        st.stop()
+
+    cfg = {
+        "account": os.getenv("SNOWFLAKE_ACCOUNT"),
+        "user": os.getenv("SNOWFLAKE_USER"),
+        "password": os.getenv("SF_PASSWORD"),
+        "role": os.getenv("SNOWFLAKE_ROLE"),
+        "warehouse": os.getenv("SNOWFLAKE_WAREHOUSE"),
+        "database": os.getenv("SNOWFLAKE_DATABASE"),
+        "schema": os.getenv("SNOWFLAKE_EDW_SCHEMA", "EDW"),
+    }
+    try:
+        return Session.builder.configs(cfg).create()
+    except Exception as e:  # pragma: no cover
+        st.error(f"Failed to create Snowpark session locally: {e}")
+        st.stop()
 
 
 def _in_list(col: str, values: List[str]) -> str:
@@ -113,26 +156,30 @@ def main():
             JOIN {database}.{edw_schema}.DIM_LOCATION d ON l.dest_loc_id = d.loc_id
             QUALIFY ROW_NUMBER() OVER (ORDER BY label) <= 5000
         )
-        SELECT 'customer' AS k, name AS v FROM c
-        UNION ALL SELECT 'carrier', name FROM cr
-        UNION ALL SELECT 'equipment', name FROM eq
-        UNION ALL SELECT 'lane', label FROM ln
+        SELECT 'customer' AS "k", name AS "v" FROM c
+        UNION ALL SELECT 'carrier' AS "k", name AS "v" FROM cr
+        UNION ALL SELECT 'equipment' AS "k", name AS "v" FROM eq
+        UNION ALL SELECT 'lane' AS "k", label AS "v" FROM ln
         """
     ).to_pandas()
+    # Normalize column names to lowercase for consistent access
+    dim_df.columns = [str(c).lower() for c in dim_df.columns]
 
-    customers = dim_df.loc[dim_df.k == "customer", "v"].tolist()
-    carriers = dim_df.loc[dim_df.k == "carrier", "v"].tolist()
-    equipments = dim_df.loc[dim_df.k == "equipment", "v"].tolist()
-    lanes = dim_df.loc[dim_df.k == "lane", "v"].tolist()
+    customers = dim_df.loc[dim_df["k"] == "customer", "v"].tolist() if not dim_df.empty else []
+    carriers = dim_df.loc[dim_df["k"] == "carrier", "v"].tolist() if not dim_df.empty else []
+    equipments = dim_df.loc[dim_df["k"] == "equipment", "v"].tolist() if not dim_df.empty else []
+    lanes = dim_df.loc[dim_df["k"] == "lane", "v"].tolist() if not dim_df.empty else []
 
     # Parameters
     grace = st.sidebar.slider("Grace Minutes (OTD/OTIF)", min_value=0, max_value=120, value=60, step=5)
     gm_target = st.sidebar.slider("GM/Mile Target", min_value=0.10, max_value=1.00, value=0.40, step=0.05)
 
     # Date range defaults
-    anchor = session.sql(
+    anchor_df = session.sql(
         f"SELECT MAX(DATE(delivery_actual_ts)) AS d FROM {database}.{edw_schema}.FACT_SHIPMENT"
-    ).to_pandas()["D"].iloc[0]
+    ).to_pandas()
+    anchor_df.columns = [str(c).lower() for c in anchor_df.columns]
+    anchor = anchor_df["d"].iloc[0] if not anchor_df.empty else None
     default_start = None
     default_end = None
     if anchor is not None:
@@ -256,6 +303,7 @@ def main():
     LIMIT 50
     """
     lane_df = session.sql(lane_sql).to_pandas()
+    lane_df.columns = [str(c).lower() for c in lane_df.columns]
     import altair as alt  # type: ignore
 
     if not lane_df.empty:
@@ -283,6 +331,7 @@ def main():
     GROUP BY 1,2
     """
     ex_df = session.sql(ex_sql).to_pandas()
+    ex_df.columns = [str(c).lower() for c in ex_df.columns]
     if not ex_df.empty:
         heat = (
             alt.Chart(ex_df)
@@ -326,4 +375,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

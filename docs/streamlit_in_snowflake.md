@@ -12,6 +12,19 @@ This app mirrors the Power BI KPIs/visuals (OTD, OTIF, GM/Mile, Tender Acceptanc
 - EDW tables populated (via Keboola transformation or manual load).
 - `.env.snowflake` configured (see `snowflake/snowflakeInfo.md`).
 
+## Local Development
+
+- Install dependencies:
+  - `python -m pip install -r requirements-dev.txt`
+- Export env (or copy `.env.snowflake`):
+  - `set -a; source ./.env.snowflake; set +a`
+- Run locally:
+  - `./scripts/run_streamlit_local.sh`
+
+Notes:
+- The app will build a Snowpark session locally using your `.env.snowflake` values.
+- Keep libraries to those available in Snowflake’s Streamlit runtime (streamlit, pandas, altair, snowflake-snowpark-python).
+
 ## Deploy (CLI)
 
 - Upload code and create the app:
@@ -36,4 +49,3 @@ This app mirrors the Power BI KPIs/visuals (OTD, OTIF, GM/Mile, Tender Acceptanc
 ## Notes
 - The app uses SQL queries similar to `snowflake/05_visual_validation.sql` to compute KPIs server-side.
 - For large datasets, adjust limits in queries (e.g., lane list and drill table LIMITs).
-
