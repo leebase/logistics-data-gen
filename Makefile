@@ -37,12 +37,12 @@ clean:
 
 streamlit_local: install
 	@echo "Running local Streamlit app (use .env.snowflake for credentials)..."
-	. $(VENV)/bin/activate && ./scripts/run_streamlit_local.sh
+	. $(VENV)/bin/activate && bash scripts/run_streamlit_local.sh
 
 .PHONY: dev_up
 dev_up: install
 	@echo "Starting local Streamlit with health check & auto-open..."
-	. $(VENV)/bin/activate && ./scripts/dev_up.sh
+	. $(VENV)/bin/activate && bash scripts/dev_up.sh
 
 .PHONY: expose
 expose:
