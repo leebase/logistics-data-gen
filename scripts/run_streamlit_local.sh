@@ -20,4 +20,8 @@ if ! command -v streamlit >/dev/null 2>&1; then
   python3 -m pip install -r "$root/requirements-dev.txt"
 fi
 
-exec streamlit run "$root/streamlit/app.py"
+# Allow overriding port and host
+PORT="${STREAMLIT_PORT:-8501}"
+HOST="${STREAMLIT_HOST:-127.0.0.1}"
+
+exec streamlit run "$root/streamlit/app.py" --server.headless true --server.port "$PORT" --server.address "$HOST"
