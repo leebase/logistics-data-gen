@@ -1,0 +1,33 @@
+-- Provision base Snowflake objects for the ETL interview
+-- Run as ACCOUNTADMIN (or role with equivalent privileges)
+-- Idempotent: safe to re-run
+
+-- Naming conventions
+SET DB_NAME = 'ETL_INTERVIEW';
+SET WH_NAME = 'ETL_INTERVIEW_WH';
+SET RM_NAME = 'ETL_INTERVIEW_RM';
+
+-- Resource monitor (cap spend)
+CREATE RESOURCE MONITOR IF NOT EXISTS IDENTIFIER($RM_NAME)
+  WITH CREDIT_QUOTA = 10
+  FREQUENCY = 'WEEKLY'
+  START_TIMESTAMP = IMMEDIATELY
+  TRIGGERS ON 100 PERCENT DO SUSPEND;
+
+-- Warehouse
+CREATE WAREHOUSE IF NOT EXISTS IDENTIFIER($WH_NAME)
+  WITH WAREHOUSE_SIZE = 'XSMALL'
+  AUTO_SUSPEND = 120
+  AUTO_RESUME = TRUE
+  INITIALLY_SUSPENDED = TRUE
+  RESOURCE_MONITOR = IDENTIFIER($RM_NAME);
+
+-- Database
+CREATE DATABASE IF NOT EXISTS IDENTIFIER($DB_NAME);
+
+-- Housekeeping
+USE WAREHOUSE IDENTIFIER($WH_NAME);
+USE DATABASE IDENTIFIER($DB_NAME);
+
+-- Note: Candidate-specific schemas/roles/users are created by 01_provision_candidates.sql
+

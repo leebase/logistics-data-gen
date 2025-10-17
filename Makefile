@@ -1,6 +1,7 @@
 SHELL := /bin/bash
 
-.PHONY: venv install data snowflake_ddl load checks clean install_hooks streamlit_local
+.PHONY: venv install data snowflake_ddl load checks clean install_hooks streamlit_local \
+        pbi_clone pbi_grants pbi_setup
 
 VENV := .venv
 PY := $(VENV)/bin/python
@@ -51,3 +52,16 @@ expose:
 
 install_hooks:
 	@bash scripts/install_git_hooks.sh
+
+# ---- Power BI (Snowflake) ----
+# Requires snowsql and Snowflake env vars (SNOWSQL_*) or CLI login.
+pbi_clone:
+	@echo "Cloning EDW tables into ETL_INTERVIEW.POWERBI_DWH via zero-copy clone..."
+	@snowsql -f snowflake/admin/20_powerbi_clone.sql
+
+pbi_grants:
+	@echo "Granting read access on POWERBI_DWH to candidate roles and PBI_REVIEWER..."
+	@snowsql -f snowflake/admin/21_powerbi_grants.sql
+
+pbi_setup: pbi_clone pbi_grants
+	@echo "POWERBI_DWH ready."
