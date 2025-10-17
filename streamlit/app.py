@@ -133,7 +133,8 @@ def _filters_clause(
 
 def main():
     st.set_page_config(page_title="Logistics KPIs", layout="wide")
-    session = get_session()
+    is_local = os.getenv("USE_LOCAL_DATA", "0").strip() in {"1", "true", "True"}
+    session = None if is_local else get_session()
 
     # Set a short statement timeout to avoid long hangs in UI (seconds)
     try:
@@ -143,21 +144,163 @@ def main():
         pass
 
     # Context
-    current_db = session.sql("SELECT CURRENT_DATABASE(), CURRENT_SCHEMA() ").to_pandas()
-    default_db = current_db.iloc[0, 0]
-    database = os.getenv("STREAMLIT_EDW_DATABASE", default_db)
-    edw_schema = os.getenv("STREAMLIT_EDW_SCHEMA", "EDW")
+    if not is_local:
+        current_db = session.sql("SELECT CURRENT_DATABASE(), CURRENT_SCHEMA() ").to_pandas()
+        default_db = current_db.iloc[0, 0]
+        database = os.getenv("STREAMLIT_EDW_DATABASE", default_db)
+        edw_schema = os.getenv("STREAMLIT_EDW_SCHEMA", "EDW")
+    else:
+        database = "LOCAL"
+        edw_schema = "EDW"
 
     st.sidebar.header("Filters")
     # Fetch lists
     @st.cache_data(show_spinner=False, ttl=60)
     def run_df(sql: str) -> pd.DataFrame:
         t0 = perf_counter()
-        df = session.sql(sql).to_pandas()
-        df.columns = [str(c).lower() for c in df.columns]
+        if not is_local:
+            df = session.sql(sql).to_pandas()
+            df.columns = [str(c).lower() for c in df.columns]
+        else:
+            df = _run_local(sql)
         t1 = perf_counter()
         st.session_state.setdefault("_query_times", []).append({"sql": sql[:80] + ("..." if len(sql) > 80 else ""), "ms": int((t1 - t0)*1000)})
         return df
+
+    @st.cache_resource(show_spinner=False)
+    def _load_local() -> dict:
+        base = os.getenv("LOCAL_DATA_DIR", "data/out")
+        def read(name: str, parse_ts: list[str] | None = None) -> pd.DataFrame:
+            df = pd.read_csv(os.path.join(base, name))
+            if parse_ts:
+                for c in parse_ts:
+                    if c in df.columns:
+                        df[c] = pd.to_datetime(df[c], errors="coerce", utc=True)
+            return df
+        return {
+            "dim_customer": read("DIM_CUSTOMER.csv"),
+            "dim_carrier": read("DIM_CARRIER.csv"),
+            "dim_equipment": read("DIM_EQUIPMENT.csv"),
+            "dim_location": read("DIM_LOCATION.csv"),
+            "dim_lane": read("DIM_LANE.csv"),
+            "fact_shipment": read("FACT_SHIPMENT.csv", ["tender_ts","pickup_plan_ts","pickup_actual_ts","delivery_plan_ts","delivery_actual_ts"]),
+            "fact_event": read("FACT_EVENT.csv", ["event_ts"]),
+        }
+
+    def _run_local(sql: str) -> pd.DataFrame:
+        # Heuristic mapping of known queries to local pandas computations
+        data = _load_local()
+        dc = data["dim_customer"].copy()
+        dcar = data["dim_carrier"].copy()
+        deq = data["dim_equipment"].copy()
+        dloc = data["dim_location"].copy()
+        dlane = data["dim_lane"].copy()
+        fs = data["fact_shipment"].copy()
+        fe = data["fact_event"].copy()
+
+        # DIM lists
+        if "DIM_CUSTOMER" in sql and "DIM_CARRIER" in sql and "DIM_EQUIPMENT" in sql and "UNION ALL" in sql and "label" in sql:
+            ln = dlane.merge(dloc.add_prefix("o_"), left_on="origin_loc_id", right_on="o_loc_id") \
+                      .merge(dloc.add_prefix("d_"), left_on="dest_loc_id", right_on="d_loc_id")
+            lane_labels = (ln["o_city"] + " → " + ln["d_city"]).rename("v").to_frame()
+            out = []
+            out.append(pd.DataFrame({"k": "customer", "v": sorted(dc["name"].dropna().unique().tolist())}))
+            out.append(pd.DataFrame({"k": "carrier", "v": sorted(dcar["name"].dropna().unique().tolist())}))
+            out.append(pd.DataFrame({"k": "equipment", "v": sorted(deq["type"].dropna().unique().tolist())}))
+            lane_top = lane_labels.dropna().drop_duplicates().sort_values("v").head(5000)
+            out.append(pd.DataFrame({"k": ["lane"] * len(lane_top), "v": lane_top["v"].tolist()}))
+            return pd.concat(out, ignore_index=True)
+
+        # Anchor date
+        if "MAX(DATE(delivery_actual_ts)) AS d" in sql:
+            dmax = fs["delivery_actual_ts"].dropna()
+            d = dmax.max().date() if len(dmax) else None
+            return pd.DataFrame({"d": [d]})
+
+        # Lane perf
+        if "FROM" in sql and "DIM_LANE" in sql and "AVG(DATEDIFF('day'" in sql and "otd_rate" in sql:
+            # Apply no filters in local mapping
+            df = fs.dropna(subset=["pickup_actual_ts","delivery_actual_ts"]).copy()
+            # grace from slider is embedded in SQL; assume 60 here for preview
+            grace = 60
+            df["is_otd"] = (df["delivery_actual_ts"] <= df["delivery_plan_ts"] + pd.to_timedelta(grace, unit="m"))
+            ln = dlane.merge(dloc.add_prefix("o_"), left_on="origin_loc_id", right_on="o_loc_id") \
+                      .merge(dloc.add_prefix("d_"), left_on="dest_loc_id", right_on="d_loc_id")
+            lab = (ln["o_city"] + " → " + ln["d_city"]).rename("lane").to_frame()
+            df = df.merge(dlane[["lane_id"]], left_on="lane_id", right_on="lane_id", how="left")
+            df = df.merge(lab.join(dlane.set_index("lane_id"), how="right").reset_index()[["lane_id","lane"]], on="lane_id", how="left")
+            g = df.groupby("lane", dropna=False).agg(shipments=("shipment_id","count"), avg_transit_days=(lambda x: None))
+            df["transit_days"] = (df["delivery_actual_ts"] - df["pickup_actual_ts"]).dt.days
+            g = df.groupby("lane", dropna=False).agg(shipments=("shipment_id","count"), avg_transit_days=("transit_days","mean"), otd_rate=("is_otd","mean")).reset_index()
+            return g.sort_values("shipments", ascending=False).head(50)
+
+        # OTD last/prior
+        if "otd_last_30" in sql or ("DATEADD('day', -29" in sql and "prev30" in sql):
+            df = fs.dropna(subset=["delivery_actual_ts"]).copy()
+            if df.empty:
+                return pd.DataFrame({"otd_last_30":[0.0],"otd_prior_30":[0.0]})
+            anchor = df["delivery_actual_ts"].dt.date.max()
+            last_start = anchor - pd.Timedelta(days=29)
+            prev_start = anchor - pd.Timedelta(days=60)
+            prev_end = anchor - pd.Timedelta(days=30)
+            grace = 60
+            df["is_otd"] = (df["delivery_actual_ts"] <= df["delivery_plan_ts"] + pd.to_timedelta(grace, unit="m"))
+            d = df["delivery_actual_ts"].dt.date
+            last = df[(d >= last_start) & (d <= anchor)]
+            prev = df[(d >= prev_start) & (d <= prev_end)]
+            def rate(x):
+                n = len(x)
+                return float(x["is_otd"].sum())/n if n else 0.0
+            return pd.DataFrame({"otd_last_30":[rate(last)], "otd_prior_30":[rate(prev)]})
+
+        # Average transit days
+        if "AVG(DATEDIFF('day', pickup_actual_ts, delivery_actual_ts))" in sql:
+            df = fs.dropna(subset=["pickup_actual_ts","delivery_actual_ts"]).copy()
+            if df.empty:
+                return pd.DataFrame({"avg_transit_days":[0.0]})
+            df["td"] = (df["delivery_actual_ts"] - df["pickup_actual_ts"]).dt.days
+            return pd.DataFrame({"avg_transit_days":[df["td"].mean()]})
+
+        # Tender acceptance (events)
+        if "FROM" in sql and "FACT_EVENT" in sql and "Tendered" in sql and "Accepted" in sql:
+            tendered = set(fe.loc[fe["event_type"]=="Tendered","shipment_id"].unique().tolist())
+            accepted = set(fe.loc[fe["event_type"]=="Accepted","shipment_id"].unique().tolist())
+            rate = float(len(accepted))/float(len(tendered)) if tendered else 0.0
+            return pd.DataFrame({"tender_acceptance_events":[rate]})
+
+        # Exception heatmap (counts)
+        if "Exception" in sql and "DIM_CUSTOMER" in sql:
+            ex = fe[fe["event_type"]=="Exception"].copy()
+            if ex.empty:
+                return pd.DataFrame(columns=["customer_name","exception_type","exceptions"])
+            # Map shipment->customer
+            ex = ex.merge(fs[["shipment_id","customer_id"]], on="shipment_id", how="left")
+            ex = ex.merge(dc[["customer_id","name"]].rename(columns={"name":"customer_name"}), on="customer_id", how="left")
+            ex["exception_type"] = ex["notes"].fillna("Unknown")
+            g = ex.groupby(["customer_name","exception_type"], dropna=False).size().reset_index(name="exceptions")
+            return g
+
+        # Drill table
+        if "SELECT" in sql and "Shipment Details" not in sql and "gm_per_mile" in sql:
+            df = fs.copy()
+            df = df.merge(dc[["customer_id","name"]].rename(columns={"name":"customer_name"}), on="customer_id", how="left")
+            df = df.merge(dcar[["carrier_id","name"]].rename(columns={"name":"carrier_name"}), on="carrier_id", how="left")
+            ln = dlane.merge(dloc.add_prefix("o_"), left_on="origin_loc_id", right_on="o_loc_id") \
+                      .merge(dloc.add_prefix("d_"), left_on="dest_loc_id", right_on="d_loc_id")
+            label_map = ln.set_index("lane_id").apply(lambda r: f"{r['o_city']} → {r['d_city']}", axis=1)
+            df["lane"] = df["lane_id"].map(label_map)
+            df["isdeliveredontime_calc"] = (df["delivery_actual_ts"] <= df["delivery_plan_ts"] + pd.to_timedelta(60, unit="m"))
+            df["isotif"] = df["isdeliveredontime_calc"] & df["isinfull"].fillna(False)
+            df["gm_per_mile"] = (df["revenue"] - df["total_cost"]) / df["planned_miles"].replace(0, pd.NA)
+            cols = [
+                "shipment_id","leg_id","customer_name","carrier_name","lane","status",
+                "pickup_plan_ts","pickup_actual_ts","delivery_plan_ts","delivery_actual_ts",
+                "isdeliveredontime_calc","isinfull","isotif","planned_miles","actual_miles","revenue","total_cost","gm_per_mile"
+            ]
+            return df[cols].head(1000)
+
+        # Fallback empty
+        return pd.DataFrame()
 
     dim_df = run_df(
         f"""
