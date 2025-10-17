@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+from time import perf_counter
 from typing import List, Optional
 
 import streamlit as st
@@ -149,14 +150,14 @@ def main():
 
     st.sidebar.header("Filters")
     # Fetch lists
+    @st.cache_data(show_spinner=False, ttl=60)
     def run_df(sql: str) -> pd.DataFrame:
-        try:
-            df = session.sql(sql).to_pandas()
-            df.columns = [str(c).lower() for c in df.columns]
-            return df
-        except Exception as e:
-            st.error(f"Query failed: {e}")
-            return pd.DataFrame()
+        t0 = perf_counter()
+        df = session.sql(sql).to_pandas()
+        df.columns = [str(c).lower() for c in df.columns]
+        t1 = perf_counter()
+        st.session_state.setdefault("_query_times", []).append({"sql": sql[:80] + ("..." if len(sql) > 80 else ""), "ms": int((t1 - t0)*1000)})
+        return df
 
     dim_df = run_df(
         f"""
@@ -298,6 +299,10 @@ def main():
     col4.metric("Avg Transit Days", f"{avg_transit:.2f}")
 
     st.divider()
+    # Show quick perf of last queries (debug aid)
+    if "_query_times" in st.session_state:
+        with st.expander("Query timings (last run)"):
+            st.dataframe(pd.DataFrame(st.session_state["_query_times"]))
 
     # Lane Performance (bar: Avg Transit Days, line: OTD %)
     lane_sql = f"""
