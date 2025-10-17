@@ -44,5 +44,10 @@ dev_up: install
 	@echo "Starting local Streamlit with health check & auto-open..."
 	. $(VENV)/bin/activate && ./scripts/dev_up.sh
 
+.PHONY: expose
+expose:
+	@echo "Exposing local Streamlit (port $$STREAMLIT_PORT or 8501) via cloudflared/ngrok..."
+	./scripts/expose_local.sh
+
 install_hooks:
 	@bash scripts/install_git_hooks.sh
