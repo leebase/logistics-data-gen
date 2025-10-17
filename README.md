@@ -50,6 +50,13 @@ Key deliverables:
   - Snowflake: `./scripts/deploy_streamlit.sh` and then open the app from the Snowflake UI (Database → EDW → Streamlit → LOGISTICS_DASH → Open → Rerun)
 - Learn more: see `docs/streamlit_logistics_app.md` (usage, filters, visuals, tips) and `docs/streamlit_in_snowflake.md` (deploy details).
 
+7) Validate KPIs via SQL (No UI)
+- Use `snowflake/dashboard_test.sql` to reproduce the dashboard KPIs/visuals directly in Snowflake.
+- It derives a valid date window automatically (last 180 days from the latest delivered date) and uses robust casting for timestamps.
+- Run:
+  - `snowsql -f snowflake/dashboard_test.sql`
+- If your EDW still uses quoted‑lower names, either run `snowflake/99_normalize_edw_names.sql` (worksheet, block‑by‑block) or adjust naming as needed. The Streamlit app already supports lower/mixed/upper variants.
+
 ## Repo Layout
 
 - Code and scripts: `data/`, `scripts/`, `snowflake/`, `keboola/`, `powerbi/`.
